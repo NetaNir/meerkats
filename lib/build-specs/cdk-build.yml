@@ -9,7 +9,7 @@ phases:
             - echo Build started on `date`
             - npm install -D ts-node
             - npm install -D typescript
-            - npm install @aws-cdk
+            - npm i -g aws-cdk
     post_build:
         commands:
             - cdk synth
