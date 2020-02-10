@@ -10,6 +10,7 @@ phases:
             - npm install -D ts-node
             - npm install -D typescript
             - npm i -g aws-cdk
+            - npm install
     post_build:
         commands:
             - cdk synth
