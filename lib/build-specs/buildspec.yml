@@ -1,0 +1,11 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo 'Meerkats!' > 200
+      - curl -I  https://gue5l3lgy6.execute-api.us-west-2.amazonaws.com/prod/ 2>/dev/null | head -n1 | cut -d$' ' -f2 | xargs -I {} cat {}
+  post_build:
+    commands:
+      - echo Build completed on `date`

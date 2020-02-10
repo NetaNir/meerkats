@@ -1,0 +1,15 @@
+version: 0.2
+
+phases:
+    install:
+        runtime-versions:
+            nodejs: 10
+    build:
+        commands:
+            - echo Build started on `date`
+            - npm install -D ts-node
+            - npm install -D typescript
+            - npm install @aws-cdk
+    post_build:
+        commands:
+            - cdk synth
