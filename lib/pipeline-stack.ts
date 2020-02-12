@@ -29,6 +29,7 @@ export class PipelineStack extends cdk.Stack {
     const apiGwStackOutputs = new codepipeline.Artifact();
 
     new codepipeline.Pipeline(this, 'Pipeline', {
+      restartExecutionOnUpdate: true,
       artifactBucket: pipelineBucket,
       pipelineName: 'MeerkatsPipeline',
       stages: [
@@ -70,6 +71,17 @@ export class PipelineStack extends cdk.Stack {
               }),
               input: sourceOutput,
               outputs: [cdkBuildOutput],
+            }),
+          ],
+        },
+        {
+          stageName: 'Self_Mutation',
+          actions: [
+            new codepipeline_actions.CloudFormationCreateUpdateStackAction({
+              actionName: 'Self_Mutate',
+              templatePath: cdkBuildOutput.atPath(`${this.stackName}.template.json`),
+              stackName: this.stackName,
+              adminPermissions: true,
             }),
           ],
         },
