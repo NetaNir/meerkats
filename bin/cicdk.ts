@@ -7,9 +7,12 @@ import { PipelineStack } from '../lib/pipeline-stack';
 
 const app = new cdk.App();
 
-const apigw = new APIGWStack(app, 'APIGWStack');
-new DDBStack(app, 'DDBStack', {
-  grantRead: [apigw.handler]
+const apiGwStack = new APIGWStack(app, 'Meerkats-APIGWStack');
+const ddbStack = new DDBStack(app, 'Meerkats-DDBStack', {
+  grantRead: [apiGwStack.handler]
 });
 
-new PipelineStack(app, 'MeertkatsCodePipelineStack');
+new PipelineStack(app, 'MeertkatsCodePipelineStack', {
+  ddbStack: ddbStack,
+  apiGwStack: apiGwStack,
+});

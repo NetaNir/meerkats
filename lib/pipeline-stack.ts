@@ -1,13 +1,20 @@
 import codebuild = require('@aws-cdk/aws-codebuild');
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import *  as cdk from '@aws-cdk/core';
-import *  as kms from '@aws-cdk/aws-kms';
-import *  as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
+import * as kms from '@aws-cdk/aws-kms';
+import * as s3 from '@aws-cdk/aws-s3';
 import { APIGWStack } from './agigw-stack';
+import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
+import { DDBStack } from "./ddb-stack";
+
+export interface PipelineStackProps extends cdk.StackProps {
+  readonly ddbStack: DDBStack;
+  readonly apiGwStack: APIGWStack;
+}
 
 export class PipelineStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
 
     // allow customizing the SecretsManager GitHub token name
@@ -77,11 +84,10 @@ export class PipelineStack extends cdk.Stack {
         {
           stageName: 'Self_Mutation',
           actions: [
-            new codepipeline_actions.CloudFormationCreateUpdateStackAction({
-              actionName: 'Self_Mutate',
-              templatePath: cdkBuildOutput.atPath(`${this.stackName}.template.json`),
-              stackName: this.stackName,
-              adminPermissions: true,
+            new DeployCdkStackAction({
+              baseActionName: 'Self_Mutate',
+              input: cdkBuildOutput,
+              stack: cdk.Stack.of(this),
             }),
           ],
         },
@@ -89,28 +95,25 @@ export class PipelineStack extends cdk.Stack {
           stageName: 'Deploy',
           actions: [
             // first, deploy the DynamoDB Stack
-            new codepipeline_actions.CloudFormationCreateUpdateStackAction({
-              actionName: 'Deploy_DynamoDB_Stack',
-              templatePath: cdkBuildOutput.atPath('DDBStack.template.json'),
-              stackName: 'Meerkats-DDBStack',
-              adminPermissions: true,
+            new DeployCdkStackAction({
+              baseActionName: 'Deploy_DynamoDB_Stack',
+              input: cdkBuildOutput,
+              stack: props.ddbStack,
             }),
             // then, deploy the API Gateway Stack
-            new codepipeline_actions.CloudFormationCreateUpdateStackAction({
-              actionName: 'Deploy_API_GW_Stack',
-              templatePath: cdkBuildOutput.atPath('APIGWStack.template.json'),
-              stackName: 'Meerkats-APIGWStack',
-              adminPermissions: true,
-              runOrder: 2,
-              // generate a file with the outputs
-              // (in this case, just the generated URL of the API Gateway endpoint)
+            new DeployCdkStackAction({
+              baseActionName: 'Deploy_API_GW_Stack',
+              input: cdkBuildOutput,
+              stack: props.apiGwStack,
               output: apiGwStackOutputs,
               outputFileName: 'outputs.json',
+              baseRunOrder: 3,
             }),
+            // then, run an integration test
             new codepipeline_actions.CodeBuildAction({
               actionName: 'Integ_Test',
               input: apiGwStackOutputs,
-              runOrder: 3,
+              runOrder: 5,
               project: new codebuild.PipelineProject(this, 'IntegTestProject', {
                 buildSpec: codebuild.BuildSpec.fromObject({
                   version: '0.2',
