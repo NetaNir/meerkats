@@ -1,7 +1,5 @@
 import * as cdk from '@aws-cdk/core';
 import * as ddb from '@aws-cdk/aws-dynamodb';
-import * as ec2 from '@aws-cdk/aws-ec2';
-import * as iam from '@aws-cdk/aws-iam';
 import { IGrantable } from '@aws-cdk/aws-iam';
 
 export interface DDBStackProps extends cdk.StackProps {
@@ -9,7 +7,7 @@ export interface DDBStackProps extends cdk.StackProps {
 }
 
 export class DDBStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: DDBStackProps) {
+  constructor(scope: cdk.Construct, id: string, props: DDBStackProps = {}) {
     super(scope, id, props);
     
     const table = new ddb.Table(this, 'MeerkatTable', {  
@@ -17,11 +15,11 @@ export class DDBStack extends cdk.Stack {
         name: 'name',
         type: ddb.AttributeType.STRING 
       }, 
-      tableName: 'MeerkatTable'
+      tableName: 'MeerkatTable',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    props?.grantRead?.filter(r => r !== undefined)
-    .forEach(r => {
-      table.grantFullAccess(r)
+    props.grantRead?.forEach(grantable => {
+      table.grantFullAccess(grantable);
     });
-  } 
+  }
 }

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@aws-cdk/aws-apigateway": "^1.23.0",
+    "@aws-cdk/aws-codebuild": "^1.23.0",
     "@aws-cdk/aws-codepipeline": "^1.23.0",
     "@aws-cdk/aws-codepipeline-actions": "^1.23.0",
     "@aws-cdk/aws-dynamodb": "^1.23.0",
