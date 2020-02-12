@@ -5,6 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path'
 
 export class APIGWStack extends cdk.Stack {
+  public static readonly URL_OUTPUT = 'MeerkatApiGwUrlOutput';
+
   public readonly handler: lambda.Function;
 
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -17,10 +19,15 @@ export class APIGWStack extends cdk.Stack {
       environment: {
         TABLE_NAME: 'MeerkatTable'
       },
+      description: 'Fake description to force a redeploy of the stack.',
     });
 
-    new apigw.LambdaRestApi(this, 'APIGW', {
+    const lambdaRestApi = new apigw.LambdaRestApi(this, 'APIGW', {
       handler: this.handler
-    })
+    });
+    // add an output with a well-known name to read it from the integ tests
+    new cdk.CfnOutput(this, APIGWStack.URL_OUTPUT, {
+      value: lambdaRestApi.url,
+    });
   }
 }
