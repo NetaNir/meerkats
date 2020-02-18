@@ -20,6 +20,10 @@
     "ts-node": "^8.1.0",
     "typescript": "~3.7.2"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NetaNir/meerkats.git"
+  },
   "dependencies": {
     "@aws-cdk/aws-apigateway": "^1.23.0",
     "@aws-cdk/aws-codebuild": "^1.23.0",

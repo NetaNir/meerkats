@@ -1,0 +1,45 @@
+#!/bin/bash
+# Symlink current lerna repo to published packages in another lerna repo
+# Will not work in any path containing spaces.
+set -eu
+target_repo=$1
+target_repo=$(cd $target_repo && pwd)
+
+targets=$(cd $target_repo && node_modules/.bin/lerna ls --json)
+my_package_jsons=$(find . -name node_modules -prune -o -name package.json -print)
+
+for pj in $my_package_jsons; do
+    (
+        cd $(dirname $pj)
+        eval $(node - "$targets" <<'EOF'
+const package = require('./package.json');
+const targets = JSON.parse(process.argv[2]);
+const fs = require('fs');
+const path = require('path');
+
+['dependencies', 'devDependencies'].forEach(depType => {
+    const deps = package[depType] || {};
+
+    targets.forEach(target => {
+        if (target.name in deps) {
+            console.log(`echo "$PWD/node_modules/${target.name} -> ${target.location}";`);
+            console.log(`rm -rf node_modules/${target.name};`);
+            console.log(`ln -s ${target.location} node_modules/${target.name};`);
+
+            const targetScripts = require(path.join(target.location, 'package.json')).bin || {};
+            for (const [script, binScript] of Object.entries(targetScripts)) {
+                const fullTarget = path.join(target.location, binScript);
+                console.log(`echo "$PWD/node_modules/.bin/${script} -> ${fullTarget}";`);
+
+                console.log(`mkdir -p node_modules/.bin;`);
+                console.log(`ln -sf ${fullTarget} node_modules/.bin/${script};`);
+            }
+        }
+    });
+});
+
+EOF
+)
+    )
+done
+

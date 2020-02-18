@@ -1,14 +1,22 @@
-# Welcome to your CDK TypeScript project!
+# Meerkats: a reference app for CI/CD
 
-This is a blank project for TypeScript development with CDK.
+## How to use
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+```
+$ yarn install
+$ yarn build
+$ npx cdk deploy -e MeertkatsCodePipelineStack
+```
 
-## Useful commands
+To run this against a custom branch of the `aws-cdk` repo, do the following:
 
- * `npm run build`   compile typescript to js
- * `npm run watch`   watch for changes and compile
- * `npm run test`    perform the jest unit tests
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+```
+$ yarn install
+$ ./link2lerna /path/to/aws-cdk
+# ... Use as usual
+```
+
+## TODO
+
+- Automatic dependency selection: `cdk deploy MeertkatsCodePipelineStack` automatically
+  includes the DDB stack. That is probably not intended?
