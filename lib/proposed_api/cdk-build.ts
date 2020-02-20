@@ -38,7 +38,7 @@ export abstract class CdkBuilds {
                 // save the generated files in the output artifact
                 artifacts: {
                   'base-directory': 'cdk.out',
-                  files: '**/*',
+                  "files": '**/*',
                 },
               }),
             }),
@@ -48,7 +48,7 @@ export abstract class CdkBuilds {
           cdkBuildOutput,
         };
       }
-    }
+    };
   }
 
   public static standardJavaBuild(_cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
@@ -76,6 +76,6 @@ export abstract class CdkBuilds {
           cdkBuildOutput,
         };
       }
-    }
+    };
   }
 }

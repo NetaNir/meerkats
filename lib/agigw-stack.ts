@@ -1,8 +1,8 @@
-import * as cdk from '@aws-cdk/core';
 import * as apigw from '@aws-cdk/aws-apigateway';
 import * as lambda from '@aws-cdk/aws-lambda';
+import * as cdk from '@aws-cdk/core';
 import * as fs from 'fs';
-import * as path from 'path'
+import * as path from 'path';
 
 export class APIGWStack extends cdk.Stack {
   public static readonly URL_OUTPUT = 'MeerkatApiGwUrlOutput';

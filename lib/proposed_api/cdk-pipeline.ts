@@ -1,6 +1,6 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as cdk from '@aws-cdk/core';
 import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 

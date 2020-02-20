@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import 'source-map-support/register';
 import * as cdk from '@aws-cdk/core';
+import 'source-map-support/register';
 import { APIGWStack } from '../lib/agigw-stack';
 import { DDBStack } from '../lib/ddb-stack';
 import { PipelineStack } from '../lib/pipeline-stack';
@@ -13,6 +13,6 @@ const ddbStack = new DDBStack(app, 'Meerkats-DDBStack', {
 });
 
 new PipelineStack(app, 'MeertkatsCodePipelineStack', {
-  ddbStack: ddbStack,
-  apiGwStack: apiGwStack,
+  ddbStack,
+  apiGwStack,
 });

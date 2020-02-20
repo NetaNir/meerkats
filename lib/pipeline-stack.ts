@@ -1,14 +1,14 @@
 import codebuild = require('@aws-cdk/aws-codebuild');
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import * as cdk from '@aws-cdk/core';
 import * as kms from '@aws-cdk/aws-kms';
 import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
 import { APIGWStack } from './agigw-stack';
-import { DeployCdkStackAction } from "./proposed_api/deploy-cdk-stack-action";
 import { DDBStack } from "./ddb-stack";
-import { CdkPipeline } from "./proposed_api/cdk-pipeline";
 import { CdkBuilds } from "./proposed_api/cdk-build";
+import { CdkPipeline } from "./proposed_api/cdk-pipeline";
+import { DeployCdkStackAction } from "./proposed_api/deploy-cdk-stack-action";
 
 export interface PipelineStackProps extends cdk.StackProps {
   readonly ddbStack: DDBStack;
