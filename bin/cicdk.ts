@@ -16,3 +16,5 @@ new PipelineStack(app, 'MeertkatsCodePipelineStack', {
   ddbStack,
   apiGwStack,
 });
+
+app.synth();

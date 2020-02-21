@@ -28,7 +28,6 @@ export interface DeployCdkStackActionProps {
 export class DeployCdkStackAction implements codepipeline.IAction {
   private static readonly ACTION_ROLE_ID = 'CfnActionRole';
   private static readonly DEPLOY_ROLE_ID = 'CfnExecRole';
-
   private readonly stack: cdk.Stack;
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
@@ -36,9 +35,15 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   constructor(props: DeployCdkStackActionProps) {
     this.stack = props.stack;
 
+    const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig();
+    if (!deployConfig.assumeRoleArn) {
+      // tslint:disable-next-line:max-line-length
+      throw new Error(`DeploymentEnvironment of stack '${props.stack.node.id}' must supply deployment Role ARNs; use ConventionMode deployment environment.`);
+    }
+
     // the bootstrap roles
-    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, 'cdk-bootstrap-deploy-action-role');
-    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, 'cdk-bootstrap-cfn-exec-role');
+    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
+    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationPassRoleArn);
 
     const createChangeSetRunOrder = props.baseRunOrder ?? 1;
     const executeChangeSetRunOrder = createChangeSetRunOrder + 1;
@@ -81,11 +86,12 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     return this.executeChangeSetAction.actionProperties;
   }
 
-  private getActionRole(id: string, roleNamePrefix: string): iam.IRole {
+  private getActionRole(id: string, arn: string | undefined): iam.IRole | undefined {
+    if (!arn) { return undefined; }
+
     const existingRole = this.stack.node.tryFindChild(id) as iam.IRole;
     return existingRole
       ? existingRole
-      : iam.Role.fromRoleArn(this.stack, id,
-          `arn:aws:iam::${this.stack.account}:role/${roleNamePrefix}-${this.stack.account}-${this.stack.region}`, { mutable: false });
+      : iam.Role.fromRoleArn(this.stack, id, arn, { mutable: false  });
   }
 }

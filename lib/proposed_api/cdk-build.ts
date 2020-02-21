@@ -17,8 +17,15 @@ export interface ICdkBuild {
   bind(scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig;
 }
 
+export interface StandardBuildOptions {
+  /**
+   * Environment variables to send into build
+   */
+  readonly environmentVariables?: Record<string, codebuild.BuildEnvironmentVariable>;
+}
+
 export abstract class CdkBuilds {
-  public static standardTypeScriptBuild(cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
+  public static standardTypeScriptBuild(cdkBuildOutput: codepipeline.Artifact, buildOptions: StandardBuildOptions = {}): ICdkBuild {
     return {
       bind(scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig {
         return {
@@ -41,6 +48,7 @@ export abstract class CdkBuilds {
                   "files": '**/*',
                 },
               }),
+              environmentVariables: buildOptions.environmentVariables
             }),
             input: options.sourceOutput,
             outputs: [cdkBuildOutput],
