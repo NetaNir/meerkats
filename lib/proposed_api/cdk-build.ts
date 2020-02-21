@@ -39,7 +39,7 @@ export abstract class CdkBuilds {
                     commands: 'npm install',
                   },
                   build: {
-                    commands: 'npm run cdk synth',
+                    commands: 'npm run build && npm run cdk synth',
                   },
                 },
                 // save the generated files in the output artifact

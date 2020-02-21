@@ -9,3 +9,4 @@ package-lock.json
 cdk.out
 .vscode
 yarn-error.log
+.vendor.installed

@@ -14,8 +14,8 @@ export class APIGWStack extends cdk.Stack {
 
     this.handler = new lambda.Function(this, 'MeerkatLambda', {
       runtime: lambda.Runtime.NODEJS_12_X,
-      handler: 'index.handler',
-      code: new lambda.InlineCode(fs.readFileSync(path.resolve(__dirname, "./lambda", "meerkat-lambda.js"), { encoding: 'utf-8' })),
+      handler: 'meerkat-lambda.handler',
+      code: lambda.Code.fromAsset(path.resolve(__dirname, "./lambda")),
       environment: {
         TABLE_NAME: 'MeerkatTable'
       },
