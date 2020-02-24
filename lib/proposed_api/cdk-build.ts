@@ -5,6 +5,8 @@ import * as cdk from '@aws-cdk/core';
 
 export interface CdkBuildOptions {
   readonly sourceOutput: codepipeline.Artifact;
+
+  readonly cloudAssemblyArtifact: codepipeline.Artifact;
 }
 
 export interface CdkBuildConfig {
@@ -18,7 +20,7 @@ export interface ICdkBuild {
 }
 
 export abstract class CdkBuilds {
-  public static standardTypeScriptBuild(cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
+  public static standardTypeScriptBuild(): ICdkBuild {
     return {
       bind(scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig {
         return {
@@ -43,9 +45,9 @@ export abstract class CdkBuilds {
               }),
             }),
             input: options.sourceOutput,
-            outputs: [cdkBuildOutput],
+            outputs: [options.cloudAssemblyArtifact],
           }),
-          cdkBuildOutput,
+          cdkBuildOutput: options.cloudAssemblyArtifact,
         };
       }
     };
