@@ -3,9 +3,7 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
-import { Stack } from '@aws-cdk/core';
 import { IValidation } from './validation';
-import { IAction } from '@aws-cdk/aws-codepipeline';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -46,7 +44,7 @@ export class CdkPipeline extends cdk.Construct {
           stageName: 'UpdatePipeline',
           actions: [
             new DeployCdkStackAction({
-              baseActionName: Stack.of(this).stackName,
+              baseActionName: cdk.Stack.of(this).stackName,
               input: this.cloudAssemblyArtifact,
               stack: cdk.Stack.of(this),
             }),
@@ -103,7 +101,7 @@ export interface CdkStack {
   /**
    * Stack to deploy
    */
-  readonly stack: Stack;
+  readonly stack: cdk.Stack;
 
   /**
    * Store the outputs in this artifact if given

@@ -1,17 +1,15 @@
-import { Construct } from '@aws-cdk/core';
-import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codebuild = require('@aws-cdk/aws-codebuild');
+import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
+import { Construct } from '@aws-cdk/core';
 
 export interface ProduceActionOptions {
   readonly runOrder: number;
 }
 
-
 export interface IValidation {
   produceAction(scope: Construct, options: ProduceActionOptions): codepipeline.IAction;
 }
-
 
 export interface ShellCommandsValidationProps {
   readonly name: string;
