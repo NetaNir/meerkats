@@ -3,7 +3,6 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
-import { PublishAssetsAction } from './publish-assets-action';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
