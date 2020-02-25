@@ -56,7 +56,8 @@ export class PipelineStack extends cdk.Stack {
     });
 
     // this is the artifact that will record the output containing the generated URL of the API Gateway
-    const apiGwStackOutputs = new codepipeline.Artifact();
+    // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+    const apiGwStackOutputs = new codepipeline.Artifact('Artifact_Beta_APIGWStack_Output');
     pipeline.addCdkStage({
       stageName: 'Beta',
       stacks: [
