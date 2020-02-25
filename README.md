@@ -26,17 +26,24 @@ CREATE_FAILED        | AWS::CodePipeline::Pipeline | Pipeline/Pipeline (Pipeline
 
 There's something wrong with your GitHub access token.
 
-## Using local branch of aws-cdk
+## Vendored version of aws-cdk repo
 
-This branch needs prerelease features from `aws-cdk` repo.
+This branch needs prerelease features from `aws-cdk` repo, and they need to be available in the CodeBuild project
+as well. That's why we vendor in tarballs of the CDK repo into the current repo.
+
+To update them with a newer version, do the following:
 
 ```
 aws-cdk$ git checkout feat/convmode
-aws-cdk$ yarn build
+aws-cdk$ yarn build   # Make sure everything you need has been built
+
 ...
-meerkats$ yarn install
-meerkats$ /path/to/aws-cdk/link-all.sh
+
+meerkats$ yarn vendor-in /path/to/aws-cdk
+
+# The next build will install the vendored deps.
 ```
+
 
 ## Debugging tip
 
