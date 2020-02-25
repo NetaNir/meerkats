@@ -38,7 +38,7 @@ export class CdkPipeline extends cdk.Construct {
         {
           stageName: 'Self_Mutation',
           actions: [
-            new DeployCdkStackAction({
+            new DeployCdkStackAction(this, {
               baseActionName: 'Self_Mutate',
               input: buildConfig.cdkBuildOutput,
               stack: cdk.Stack.of(this),

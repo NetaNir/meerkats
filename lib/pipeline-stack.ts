@@ -63,13 +63,13 @@ export class PipelineStack extends cdk.Stack {
       stageName: 'Deploy',
       actions: [
         // first, deploy the DynamoDB Stack
-        new DeployCdkStackAction({
+        new DeployCdkStackAction(this, {
           baseActionName: 'Deploy_DynamoDB_Stack',
           input: cdkBuildOutput,
           stack: props.ddbStack,
         }),
         // then, deploy the API Gateway Stack
-        new DeployCdkStackAction({
+        new DeployCdkStackAction(this, {
           baseActionName: 'Deploy_API_GW_Stack',
           input: cdkBuildOutput,
           stack: props.apiGwStack,

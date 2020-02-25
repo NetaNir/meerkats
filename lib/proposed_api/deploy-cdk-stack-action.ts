@@ -33,12 +33,25 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
 
-  constructor(props: DeployCdkStackActionProps) {
+  constructor(/** Eek! See below */ scope: cdk.Construct, props: DeployCdkStackActionProps) {
     this.stack = props.stack;
 
-    // the bootstrap roles
-    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, 'cdk-bootstrap-deploy-action-role');
-    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, 'cdk-bootstrap-cfn-exec-role');
+    // Warning: argument map up ahead
+    //
+    // We need a 'scope'
+    //     BECAUSE - We MUST create the Actions in the constructor
+    //         BECAUSE - actionProperties() will get called before bind() is called;
+    //         AND     - I want to be able to forward that call to the inner Action.
+    //             BECAUSE - copying details of the actionProperties() implementation to here feels wrong
+    //     AND     - The Actions need an IRole
+    //     AND     - The Roles need to be created in a scope
+    //     AND     - the only other scope object we have ('props.stack') is not good enough
+    //         BECAUSE - it will create a dependency between the pipeline stack and the application stack
+    //             BECAUSE - I don't know why. This seems broken behavior, I don't think there's a good reason to do this.
+    //         AND     - this dependency does not make sense since the pipeline will ultimately create the application stack
+
+    const actionRole = this.getActionRole(scope, props.stack, DeployCdkStackAction.ACTION_ROLE_ID, 'cdk-bootstrap-deploy-action-role');
+    const cfnDeployRole = this.getActionRole(scope, props.stack, DeployCdkStackAction.DEPLOY_ROLE_ID, 'cdk-bootstrap-cfn-exec-role');
 
     const createChangeSetRunOrder = props.baseRunOrder ?? 1;
     const executeChangeSetRunOrder = createChangeSetRunOrder + 1;
@@ -68,7 +81,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
 
   public bind(scope: cdk.Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):
       codepipeline.ActionConfig {
-    stage.addAction(this.prepareChangeSetAction);
+  stage.addAction(this.prepareChangeSetAction);
 
     return this.executeChangeSetAction.bind(scope, stage, options);
   }
@@ -81,11 +94,20 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     return this.executeChangeSetAction.actionProperties;
   }
 
-  private getActionRole(id: string, roleNamePrefix: string): iam.IRole {
-    const existingRole = this.stack.node.tryFindChild(id) as iam.IRole;
+  private getActionRole(scope: cdk.Construct, stack: cdk.Stack, prefix: string, roleNamePrefix: string): iam.IRole {
+    // The action role will be unique per region/account, which we will use from the stack.
+    const region = cdk.Token.isUnresolved(stack.region) ? 'current_region' : stack.region;
+    const account = cdk.Token.isUnresolved(stack.account) ? 'current_account' : stack.account;
+
+    const id = `${prefix}-${region}-${account}`;
+
+    const existingRole = scope.node.tryFindChild(id) as iam.IRole;
+
+    // Cannot use ARN as ID since it may contain ${AWS::Region} etc placeholders which WOULD have been
+    // fine as placeholders but we have a blanket rule against tokens in construct IDs.
     return existingRole
       ? existingRole
-      : iam.Role.fromRoleArn(this.stack, id,
+      : iam.Role.fromRoleArn(scope, id,
           `arn:aws:iam::${this.stack.account}:role/${roleNamePrefix}-${this.stack.account}-${this.stack.region}`, { mutable: false });
   }
 }
