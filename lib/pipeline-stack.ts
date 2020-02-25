@@ -42,9 +42,17 @@ export class PipelineStack extends cdk.Stack {
         oauthToken: cdk.SecretValue.secretsManager(gitHubTokenSecretName),
         owner: 'NetaNir',
         repo: 'meerkats',
+        branch: process.env.BRANCH,
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
-      build: CdkBuilds.standardTypeScriptBuild(),
+      build: CdkBuilds.standardTypeScriptBuild({
+        environmentVariables: {
+          // Forward environment variables to build if configured, so
+          // that synthesized pipeline will yield the same pipeline as has been
+          // synth'd locally.
+          ...copyEnvironmentVariables('GITHUB_TOKEN', 'BRANCH'),
+        }
+      })
     });
 
     // this is the artifact that will record the output containing the generated URL of the API Gateway
@@ -74,4 +82,14 @@ export class PipelineStack extends cdk.Stack {
       ]
     });
   }
+}
+
+function copyEnvironmentVariables(...names: string[]): Record<string, codebuild.BuildEnvironmentVariable> {
+  const ret: Record<string, codebuild.BuildEnvironmentVariable> = {};
+  for (const name of names) {
+    if (process.env[name]) {
+      ret[name] = { value: process.env[name] };
+    }
+  }
+  return ret;
 }
