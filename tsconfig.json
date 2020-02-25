@@ -15,6 +15,7 @@
     "noFallthroughCasesInSwitch": false,
     "inlineSourceMap": true,
     "inlineSources": true,
+    "resolveJsonModule": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization":false,
     "typeRoots": ["./node_modules/@types"]

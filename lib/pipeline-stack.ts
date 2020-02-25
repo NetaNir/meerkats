@@ -46,9 +46,17 @@ export class PipelineStack extends cdk.Stack {
         oauthToken: cdk.SecretValue.secretsManager(gitHubTokenSecretName),
         owner: 'NetaNir',
         repo: 'meerkats',
+        branch: process.env.BRANCH,
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
-      build: CdkBuilds.standardTypeScriptBuild(cdkBuildOutput),
+      build: CdkBuilds.standardTypeScriptBuild(cdkBuildOutput, {
+        environmentVariables: {
+          // Forward environment variables to build if configured, so
+          // that synthesized pipeline will yield the same pipeline as has been
+          // synth'd locally.
+          ...copyEnvironmentVariables('GITHUB_TOKEN', 'BRANCH'),
+        }
+      })
     });
 
     pipeline.addStage({
@@ -93,4 +101,14 @@ export class PipelineStack extends cdk.Stack {
       ],
     });
   }
+}
+
+function copyEnvironmentVariables(...names: string[]): Record<string, codebuild.BuildEnvironmentVariable> {
+  const ret: Record<string, codebuild.BuildEnvironmentVariable> = {};
+  for (const name of names) {
+    if (process.env[name]) {
+      ret[name] = { value: process.env[name] };
+    }
+  }
+  return ret;
 }
