@@ -67,6 +67,9 @@ export class PipelineStack extends cdk.Stack {
           baseActionName: 'Deploy_DynamoDB_Stack',
           input: cdkBuildOutput,
           stack: props.ddbStack,
+          // either uncomment this line, or comment out the entire action addition to the `actions` array,
+          // to see synthesis fail with a validation error
+          // baseRunOrder: 7,
         }),
         // then, deploy the API Gateway Stack
         new DeployCdkStackAction({

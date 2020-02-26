@@ -7,10 +7,7 @@ Secret with the name `my-github-token`, or set `GITHUB_TOKEN` to the name
 of it.
 
 ```
-$ yarn install
-
-// see below for linking in a pre-release version of aws-cdk
-
+$ yarn install --frozen-lockfile
 $ yarn build
 $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 $ (optional) export GITHUB_TOKEN=other-github-token-name
@@ -55,11 +52,6 @@ env NODE_OPTIONS=--inspect-brk cdk deploy
 ```
 
 Wuuuut!
-
-## TODO
-
-- Automatic dependency selection: `cdk deploy MeertkatsCodePipelineStack` automatically
-  includes the DDB stack. That is probably not intended?
 
 ## ISSUES
 

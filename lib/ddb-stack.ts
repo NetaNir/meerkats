@@ -3,23 +3,20 @@ import * as ddb from '@aws-cdk/aws-dynamodb';
 import { IGrantable } from '@aws-cdk/aws-iam';
 
 export interface DDBStackProps extends cdk.StackProps {
-  readonly grantRead?: IGrantable[];
 }
 
 export class DDBStack extends cdk.Stack {
+  public readonly table: ddb.Table;
+
   constructor(scope: cdk.Construct, id: string, props: DDBStackProps = {}) {
     super(scope, id, props);
-    
-    const table = new ddb.Table(this, 'MeerkatTable', {  
+
+    this.table = new ddb.Table(this, 'MeerkatTable', {
       partitionKey: {
         name: 'name',
-        type: ddb.AttributeType.STRING 
-      }, 
-      tableName: 'MeerkatTable',
+        type: ddb.AttributeType.STRING
+      },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-    props.grantRead?.forEach(grantable => {
-      table.grantFullAccess(grantable);
     });
   }
 }

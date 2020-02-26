@@ -28,12 +28,17 @@ export interface DeployCdkStackActionProps {
 export class DeployCdkStackAction implements codepipeline.IAction {
   private static readonly ACTION_ROLE_ID = 'CfnActionRole';
   private static readonly DEPLOY_ROLE_ID = 'CfnExecRole';
-  private readonly stack: cdk.Stack;
+
+  /** @internal */
+  public readonly _createChangeSetRunOrder: number;
+  /** @internal */
+  public readonly _stack: cdk.Stack;
+
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
 
   constructor(props: DeployCdkStackActionProps) {
-    this.stack = props.stack;
+    this._stack = props.stack;
 
     const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig();
     if (!deployConfig.assumeRoleArn) {
@@ -45,16 +50,16 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
     const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationPassRoleArn);
 
-    const createChangeSetRunOrder = props.baseRunOrder ?? 1;
-    const executeChangeSetRunOrder = createChangeSetRunOrder + 1;
+    this._createChangeSetRunOrder = props.baseRunOrder ?? 1;
+    const executeChangeSetRunOrder = this._createChangeSetRunOrder + 1;
 
     const changeSetName = 'cs1'; // ToDo change this
     this.prepareChangeSetAction = new cpactions.CloudFormationCreateReplaceChangeSetAction({
       actionName: `${props.baseActionName}_Prepare_CS`,
       changeSetName,
-      runOrder: createChangeSetRunOrder,
-      stackName: this.stack.stackName,
-      templatePath: props.input.atPath(this.stack.templateFile),
+      runOrder: this._createChangeSetRunOrder,
+      stackName: this._stack.stackName,
+      templatePath: props.input.atPath(this._stack.templateFile),
       adminPermissions: false,
       role: actionRole,
       deploymentRole: cfnDeployRole,
@@ -64,7 +69,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
       actionName: `${props.baseActionName}_Execute_CS`,
       changeSetName,
       runOrder: executeChangeSetRunOrder,
-      stackName: this.stack.stackName,
+      stackName: this._stack.stackName,
       role: actionRole,
       outputFileName: props.outputFileName,
       output: props.output,
@@ -89,9 +94,9 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   private getActionRole(id: string, arn: string | undefined): iam.IRole | undefined {
     if (!arn) { return undefined; }
 
-    const existingRole = this.stack.node.tryFindChild(id) as iam.IRole;
+    const existingRole = this._stack.node.tryFindChild(id) as iam.IRole;
     return existingRole
       ? existingRole
-      : iam.Role.fromRoleArn(this.stack, id, arn, { mutable: false  });
+      : iam.Role.fromRoleArn(this._stack, id, arn, { mutable: false });
   }
 }
