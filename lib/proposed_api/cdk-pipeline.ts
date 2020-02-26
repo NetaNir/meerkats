@@ -56,53 +56,57 @@ export class CdkPipeline extends cdk.Construct {
   protected validate(): string[] {
     const ret = new Array<string>();
 
-    const stages = this.pipeline.stages;
+    const stackActions = this.stackActions;
+    for (const [thisStackIndex, stackAction] of enumerate(stackActions)) {
+      // temporary workaround for the stack dependency problem fixed in https://github.com/aws/aws-cdk/pull/6458
+      // just skip the validation for the CodePipeline stack
+      if (stackAction._stack === cdk.Stack.of(this)) {
+        continue;
+      }
 
-    // validate that the order in the pipeline does not violate the stack dependency order
-    for (let baseStageNr = 0; baseStageNr < stages.length; baseStageNr++) {
-      const baseStage = stages[baseStageNr];
-      for (const baseAction of baseStage.actions) {
-        if (!(baseAction instanceof DeployCdkStackAction)) {
-          continue;
-        }
-        // temporary workaround for the stack dependency problem fixed in https://github.com/aws/aws-cdk/pull/6458
-        // just skip the validation for the CodePipeline stack
-        if (baseAction._stack === cdk.Stack.of(this)) {
-          continue;
-        }
-        for (const dep of baseAction._stack.dependencies) {
-          // search for the dependency among all stacks deployed by this pipeline
-          let found = false;
-          for (let depStageNr = 0; depStageNr < stages.length; depStageNr++) {
-            for (const depAction of stages[depStageNr].actions) {
-              if (!(depAction instanceof DeployCdkStackAction)) {
-                continue;
-              }
-              if (dep === depAction._stack) {
-                found = true;
+      // For every dependency, it must be deployed in an action before this one
+      for (const dep of stackAction._stack.dependencies) {
+        const depIndex = stackActions.findIndex(s => s._stack === dep);
 
-                // it's an error if the dependency is either in a later stage,
-                // or in the same stage, but not with a lower runOrder
-                if (baseStageNr < depStageNr || (baseStageNr === depStageNr &&
-                    baseAction._createChangeSetRunOrder <= depAction._createChangeSetRunOrder)) {
-                  ret.push(`Stack '${baseAction._stack.stackName}' depends on stack ` +
-                      `'${dep.stackName}', but is deployed before it in the pipeline!`);
-                }
-
-                // no point iterating anymore, break
-                break;
-              }
-            }
-          }
-
-          if (!found) {
-            ret.push(`Stack '${baseAction._stack.stackName}' depends on stack ` +
-                `'${dep.stackName}', but that dependency is not deployed through the pipeline!`);
-          }
+        if (depIndex === -1) {
+          // FIXME: We should decide how bad this is. It might be the user will
+          // deploy some stacks by hand because it contains some shared bootstrap
+          // resources?
+          ret.push(`Stack '${stackAction._stack.stackName}' depends on stack ` +
+              `'${dep.stackName}', but that dependency is not deployed through the pipeline!`);
+        } else if (depIndex > thisStackIndex) {
+          ret.push(`Stack '${stackAction._stack.stackName}' depends on stack ` +
+              `'${dep.stackName}', but is deployed before it in the pipeline!`);
         }
       }
     }
-
     return ret;
   }
+
+  /**
+   * Return all StackDeployActions in an ordered list
+   */
+  private get stackActions(): DeployCdkStackAction[] {
+    return flatMap(this.pipeline.stages, s => s.actions.filter(isDeployAction).sort(sortByRunOrder));
+  }
+}
+
+function enumerate<A>(xs: A[]): Array<[number, A]> {
+  const ret = new Array<[number, A]>();
+  for (let i = 0; i < xs.length; i++) {
+    ret.push([i, xs[i]]);
+  }
+  return ret;
+}
+
+function sortByRunOrder(a: DeployCdkStackAction, b: DeployCdkStackAction) {
+  return a._createChangeSetRunOrder - b._createChangeSetRunOrder;
+}
+
+function isDeployAction(a: codepipeline.IAction): a is DeployCdkStackAction {
+  return a instanceof DeployCdkStackAction;
+}
+
+function flatMap<A, B>(xs: A[], f: (x: A) => B[]): B[] {
+  return Array.prototype.concat([], ...xs.map(f));
 }
