@@ -48,6 +48,7 @@ elif [[ "${1:-}" == "in" ]]; then
         done
     )
     vendorhash > vendor.hash
+    npm run build
 else
     echo "Wut?" >&2
     exit 1

@@ -48,7 +48,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
 
     // the bootstrap roles
     const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
-    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationPassRoleArn);
+    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationExecutionRoleArn);
 
     this._createChangeSetRunOrder = props.baseRunOrder ?? 1;
     const executeChangeSetRunOrder = this._createChangeSetRunOrder + 1;

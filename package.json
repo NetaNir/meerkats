@@ -9,7 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "vendor-in": "./vendor.sh in && npm run build",
+    "vendor-in": "./vendor.sh in",
     "vendor-out": "./vendor.sh out"
   },
   "devDependencies": {
@@ -38,5 +38,5 @@
     "@aws-cdk/core": "^1.23.0",
     "source-map-support": "^0.5.16"
   },
-  "vendorAdditional": ["cdk-assets"]
+  "vendorAdditional": ["cdk-assets", "aws-cdk"]
 }
