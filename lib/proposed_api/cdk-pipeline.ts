@@ -3,6 +3,7 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
+import { PublishAssetsAction } from './publish-assets-action';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -44,6 +45,15 @@ export class CdkPipeline extends cdk.Construct {
               stack: cdk.Stack.of(this),
             }),
           ],
+        },
+        {
+          stageName: 'Assets',
+          actions: [new PublishAssetsAction(this, 'PublishAssets', {
+            cloudAssemblyInput: buildConfig.cdkBuildOutput,
+            // hack hack for experimentation
+            vendoredGitHubLocation: `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`,
+            vendorZipDir: 'meerkats-new-deploy-env/vendor',
+          })],
         },
       ],
     });

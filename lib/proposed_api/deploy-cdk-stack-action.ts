@@ -40,9 +40,15 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   constructor(props: DeployCdkStackActionProps) {
     this._stack = props.stack;
 
+    const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig();
+    if (!deployConfig.assumeRoleArn) {
+      // tslint:disable-next-line:max-line-length
+      throw new Error(`DeploymentEnvironment of stack '${props.stack.node.id}' must supply deployment Role ARNs; use ConventionMode deployment environment.`);
+    }
+
     // the bootstrap roles
-    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, 'cdk-bootstrap-deploy-action-role');
-    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, 'cdk-bootstrap-cfn-exec-role');
+    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
+    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationPassRoleArn);
 
     this._createChangeSetRunOrder = props.baseRunOrder ?? 1;
     const executeChangeSetRunOrder = this._createChangeSetRunOrder + 1;
@@ -85,11 +91,12 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     return this.executeChangeSetAction.actionProperties;
   }
 
-  private getActionRole(id: string, roleNamePrefix: string): iam.IRole {
+  private getActionRole(id: string, arn: string | undefined): iam.IRole | undefined {
+    if (!arn) { return undefined; }
+
     const existingRole = this._stack.node.tryFindChild(id) as iam.IRole;
     return existingRole
       ? existingRole
-      : iam.Role.fromRoleArn(this._stack, id,
-          `arn:aws:iam::${this._stack.account}:role/${roleNamePrefix}-${this._stack.account}-${this._stack.region}`, { mutable: false });
+      : iam.Role.fromRoleArn(this._stack, id, arn, { mutable: false });
   }
 }

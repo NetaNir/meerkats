@@ -5,18 +5,20 @@
     "cicdk": "bin/cicdk.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "./vendor.sh out && tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "vendor-in": "./vendor.sh in && npm run build",
+    "vendor-out": "./vendor.sh out"
   },
   "devDependencies": {
     "@aws-cdk/assert": "^1.23.0",
     "@types/jest": "^24.0.22",
     "@types/node": "10.17.5",
+    "aws-cdk": "^1.23.0",
     "jest": "^24.9.0",
     "ts-jest": "^24.1.0",
-    "aws-cdk": "^1.23.0",
     "ts-node": "^8.1.0",
     "typescript": "~3.7.2"
   },
@@ -35,5 +37,6 @@
     "@aws-cdk/aws-lambda": "^1.23.0",
     "@aws-cdk/core": "^1.23.0",
     "source-map-support": "^0.5.16"
-  }
+  },
+  "vendorAdditional": ["cdk-assets"]
 }
