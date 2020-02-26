@@ -9,7 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "vendor-in": "./vendor.sh in",
+    "vendor-in": "./vendor.sh in && npm run build",
     "vendor-out": "./vendor.sh out"
   },
   "devDependencies": {
