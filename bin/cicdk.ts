@@ -18,6 +18,7 @@ const apiGwStack = new APIGWStack(app, 'Meerkats-APIGWStack', {
 new PipelineStack(app, 'MeertkatsCodePipelineStack', {
   ddbStack,
   apiGwStack,
+  env: { region: 'us-west-2', account: '828671620168' },
 });
 
 app.synth();
