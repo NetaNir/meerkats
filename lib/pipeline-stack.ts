@@ -55,12 +55,16 @@ export class PipelineStack extends cdk.Stack {
       })
     });
 
+    // Change this line to 'true' to see synthesis fail with a validation error
+    const breakValidation = false;
+    const twiddleStacks = breakValidation ? reversed : identity;
+
     // this is the artifact that will record the output containing the generated URL of the API Gateway
     // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
     const apiGwStackOutputs = new codepipeline.Artifact('Artifact_Beta_APIGWStack_Output');
     pipeline.addCdkStage({
       stageName: 'Beta',
-      stacks: [
+      stacks: twiddleStacks([
         {
           stack: props.ddbStack
         },
@@ -68,7 +72,7 @@ export class PipelineStack extends cdk.Stack {
           stack: props.apiGwStack,
           outputsArtifact: apiGwStackOutputs,
         },
-      ],
+      ]),
       validations: [
         new ShellCommandsValidation({
           name: 'IntegTest',
@@ -93,4 +97,13 @@ function copyEnvironmentVariables(...names: string[]): Record<string, codebuild.
     }
   }
   return ret;
+}
+
+function identity<A>(x: A): A {
+  return x;
+}
+
+function reversed<A>(xs: A[]): A[] {
+  xs.reverse();
+  return xs;
 }

@@ -7,7 +7,7 @@ Secret with the name `my-github-token`, or set `GITHUB_TOKEN` to the name
 of it.
 
 ```
-$ yarn install
+$ yarn install --frozen-lockfile
 $ yarn build
 $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 $ (optional) export GITHUB_TOKEN=other-github-token-name
@@ -23,15 +23,24 @@ CREATE_FAILED        | AWS::CodePipeline::Pipeline | Pipeline/Pipeline (Pipeline
 
 There's something wrong with your GitHub access token.
 
-## Use with aws-cdk repo
+## Vendored version of aws-cdk repo
 
-To run this against a custom branch of the `aws-cdk` repo, do the following:
+This branch needs prerelease features from `aws-cdk` repo, and they need to be available in the CodeBuild project
+as well. That's why we vendor in tarballs of the CDK repo into the current repo.
+
+To update them with a newer version, do the following:
 
 ```
-$ yarn install
-$ ./link2lerna /path/to/aws-cdk
-# ... Use as usual
+aws-cdk$ git checkout feat/convmode
+aws-cdk$ yarn build   # Make sure everything you need has been built
+
+...
+
+meerkats$ yarn vendor-in /path/to/aws-cdk
+
+# The next build will install the vendored deps.
 ```
+
 
 ## Debugging tip
 
@@ -43,11 +52,6 @@ env NODE_OPTIONS=--inspect-brk cdk deploy
 ```
 
 Wuuuut!
-
-## TODO
-
-- Automatic dependency selection: `cdk deploy MeertkatsCodePipelineStack` automatically
-  includes the DDB stack. That is probably not intended?
 
 ## ISSUES
 
