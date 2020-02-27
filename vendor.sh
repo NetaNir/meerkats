@@ -16,15 +16,30 @@ vendorhash() {
     (cd vendor && sha256sum --binary *.tgz | sha256sum)
 }
 
+mkdir -p node_modules
+
 if [[ "${1:-}" == "out" ]]; then
-    touch .vendor.installed
+    touch node_modules/.vendor.installed
     hash="$(vendorhash)"
-    if [[ "$(cat .vendor.installed)" == "$hash" ]]; then
+    if [[ "$(cat node_modules/.vendor.installed)" == "$hash" ]]; then
         echo "Vendor install up to date" >&2
     else
         echo "Vendoring out" >&2
-        (cd vendor && npm install --no-save *.tgz)
-        echo "$hash" > .vendor.installed
+        # Die in a fire NPM!
+        #
+        # 2 things here:
+        #
+        # - We *must* cd to 'vendor', because 'npm install vendor/*.tgz' will make it think
+        # all arguments with a single slash in it are NPM packges or GitHub addresses.
+        #
+        # - We *must* --save to 'package.json' because otherwise 'npm install' will disregard
+        # other requirements and happily deinstall 'source-map-support', for example.
+        # Since we don't actually want the tarballs referenced in package.json (this is a hack!)
+        # we have to copy package.json out, do the manipulation, and then copy it back.
+        cp package.{json,json.bak}
+        (cd vendor && npm install --save *.tgz && npm install)
+        mv package.{json.bak,json}
+        echo "$hash" > node_modules/.vendor.installed
     fi
 
 elif [[ "${1:-}" == "in" ]]; then
