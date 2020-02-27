@@ -40,7 +40,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   constructor(props: DeployCdkStackActionProps) {
     this._stack = props.stack;
 
-    const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig();
+    const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig(cdk.ConfigVariant.CLOUDFORMATION);
     if (!deployConfig.assumeRoleArn) {
       // tslint:disable-next-line:max-line-length
       throw new Error(`DeploymentEnvironment of stack '${props.stack.node.id}' must supply deployment Role ARNs; use ConventionMode deployment environment.`);

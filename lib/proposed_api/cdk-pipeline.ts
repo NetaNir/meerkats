@@ -52,7 +52,7 @@ export class CdkPipeline extends cdk.Construct {
             cloudAssemblyInput: buildConfig.cdkBuildOutput,
             // hack hack for experimentation
             vendoredGitHubLocation: `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`,
-            vendorZipDir: 'meerkats-new-deploy-env/vendor',
+            vendorZipDir: `meerkats-${process.env.BRANCH || 'master'}/vendor`,
           })],
         },
       ],
