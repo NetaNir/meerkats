@@ -9,6 +9,7 @@ import { DDBStack } from "./ddb-stack";
 import { CdkBuilds } from "./proposed_api/cdk-build";
 import { CdkPipeline } from "./proposed_api/cdk-pipeline";
 import { DeployCdkStackAction } from "./proposed_api/deploy-cdk-stack-action";
+import { ShellCommandsValidation } from './proposed_api/validation';
 
 export interface PipelineStackProps extends cdk.StackProps {
   readonly ddbStack: DDBStack;
@@ -32,24 +33,19 @@ export class PipelineStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    const sourceOutput = new codepipeline.Artifact();
-    const cdkBuildOutput = new codepipeline.Artifact();
-    // this is the artifact that will record the output containing the generated URL of the API Gateway
-    const apiGwStackOutputs = new codepipeline.Artifact();
-
     const pipeline = new CdkPipeline(this, 'Pipeline', {
       pipelineName: 'MeerkatsPipeline',
       artifactBucket: pipelineBucket,
       source: new codepipeline_actions.GitHubSourceAction({
         actionName: 'Source_GitHub',
-        output: sourceOutput,
+        output: new codepipeline.Artifact(),
         oauthToken: cdk.SecretValue.secretsManager(gitHubTokenSecretName),
         owner: 'NetaNir',
         repo: 'meerkats',
         branch: process.env.BRANCH,
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
-      build: CdkBuilds.standardTypeScriptBuild(cdkBuildOutput, {
+      build: CdkBuilds.standardTypeScriptBuild({
         environmentVariables: {
           // Forward environment variables to build if configured, so
           // that synthesized pipeline will yield the same pipeline as has been
@@ -59,49 +55,36 @@ export class PipelineStack extends cdk.Stack {
       })
     });
 
-    pipeline.addStage({
-      stageName: 'Deploy',
-      actions: [
-        // first, deploy the DynamoDB Stack
-        new DeployCdkStackAction({
-          baseActionName: 'Deploy_DynamoDB_Stack',
-          input: cdkBuildOutput,
-          stack: props.ddbStack,
-          // either uncomment this line, or comment out the entire action addition to the `actions` array,
-          // to see synthesis fail with a validation error
-          // baseRunOrder: 7,
-        }),
-        // then, deploy the API Gateway Stack
-        new DeployCdkStackAction({
-          baseActionName: 'Deploy_API_GW_Stack',
-          input: cdkBuildOutput,
+    // Change this line to 'true' to see synthesis fail with a validation error
+    const breakValidation = false;
+    const twiddleStacks = breakValidation ? reversed : identity;
+
+    // this is the artifact that will record the output containing the generated URL of the API Gateway
+    // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+    const apiGwStackOutputs = new codepipeline.Artifact('Artifact_Beta_APIGWStack_Output');
+    pipeline.addCdkStage({
+      stageName: 'Beta',
+      stacks: twiddleStacks([
+        {
+          stack: props.ddbStack
+        },
+        {
           stack: props.apiGwStack,
-          output: apiGwStackOutputs,
-          outputFileName: 'outputs.json',
-          baseRunOrder: 3,
-        }),
-        // then, run an integration test
-        new codepipeline_actions.CodeBuildAction({
-          actionName: 'Integ_Test',
+          outputsArtifact: apiGwStackOutputs,
+        },
+      ]),
+      validations: [
+        new ShellCommandsValidation({
+          name: 'IntegTest',
           input: apiGwStackOutputs,
-          runOrder: 5,
-          project: new codebuild.PipelineProject(this, 'IntegTestProject', {
-            buildSpec: codebuild.BuildSpec.fromObject({
-              version: '0.2',
-              phases: {
-                build: {
-                  commands: [
-                    'set -e',
-                    // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
-                    `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
-                    'curl $api_gw_url',
-                  ],
-                },
-              },
-            }),
-          }),
-        }),
-      ],
+          commands: [
+            'set -e',
+            // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
+            `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
+            'curl $api_gw_url',
+          ],
+        })
+      ]
     });
   }
 }
@@ -114,4 +97,13 @@ function copyEnvironmentVariables(...names: string[]): Record<string, codebuild.
     }
   }
   return ret;
+}
+
+function identity<A>(x: A): A {
+  return x;
+}
+
+function reversed<A>(xs: A[]): A[] {
+  xs.reverse();
+  return xs;
 }

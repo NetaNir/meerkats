@@ -55,7 +55,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
 
     const changeSetName = 'cs1'; // ToDo change this
     this.prepareChangeSetAction = new cpactions.CloudFormationCreateReplaceChangeSetAction({
-      actionName: `${props.baseActionName}_Prepare_CS`,
+      actionName: `${props.baseActionName}.Prepare`,
       changeSetName,
       runOrder: this._createChangeSetRunOrder,
       stackName: this._stack.stackName,
@@ -66,7 +66,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
       capabilities: [cfn.CloudFormationCapabilities.NAMED_IAM, cfn.CloudFormationCapabilities.AUTO_EXPAND],
     });
     this.executeChangeSetAction = new cpactions.CloudFormationExecuteChangeSetAction({
-      actionName: `${props.baseActionName}_Execute_CS`,
+      actionName: `${props.baseActionName}.Deploy`,
       changeSetName,
       runOrder: executeChangeSetRunOrder,
       stackName: this._stack.stackName,
