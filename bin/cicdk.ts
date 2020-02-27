@@ -7,8 +7,11 @@ import { PipelineStack } from '../lib/pipeline-stack';
 
 const app = new cdk.App();
 
-const ddbStack = new DDBStack(app, 'Meerkats-DDBStack');
+const ddbStack = new DDBStack(app, 'Meerkats-DDBStack', {
+  env: { region: 'us-west-1' },
+});
 const apiGwStack = new APIGWStack(app, 'Meerkats-APIGWStack', {
+  env: { region: 'us-west-1' },
   table: ddbStack.table
 });
 
