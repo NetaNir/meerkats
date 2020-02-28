@@ -1,6 +1,7 @@
 import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import * as iam from '@aws-cdk/aws-iam';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
@@ -31,6 +32,32 @@ export class CdkPipeline extends cdk.Construct {
     const sourceOutput = props.source.actionProperties.outputs![0];
     const buildConfig = props.build.bind(this, { sourceOutput, cloudAssemblyArtifact: this.cloudAssemblyArtifact });
 
+    const pipelineStack = cdk.Stack.of(this);
+    const selfMutationProject = new codebuild.PipelineProject(this, 'CdkPipelineSelfMutation', {
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
+        phases: {
+          install: {
+            commands: 'npm install', // ToDo: interesting relationship between this, and the build step!
+          },
+          build: {
+            commands: [
+              'npm run build', // ToDo: here as well!
+              `npm run cdk -- deploy ${pipelineStack.stackName} -e`,
+            ],
+          },
+        },
+      }),
+    });
+    const pipelineBootstrapStackActionRole = iam.Role.fromRoleArn(this, 'PipelineBootstrapStackActionRole',
+        `arn:${pipelineStack.partition}:iam::${pipelineStack.account}:role/cdk-bootstrap-deploy-action-role-` +
+        `${pipelineStack.account}-${pipelineStack.region}`);
+    // allow the self-mutating project permissions to assume the bootstrap Action role
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: [pipelineBootstrapStackActionRole.assumeRoleAction],
+      resources: [pipelineBootstrapStackActionRole.roleArn],
+    }));
+
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
       restartExecutionOnUpdate: true,
@@ -49,22 +76,7 @@ export class CdkPipeline extends cdk.Construct {
             new cpactions.CodeBuildAction({
               actionName: 'Self_Mutate',
               input: sourceOutput,
-              project: new codebuild.PipelineProject(this, 'CdkPipelineSelfMutation', {
-                buildSpec: codebuild.BuildSpec.fromObject({
-                  version: '0.2',
-                  phases: {
-                    install: {
-                      commands: 'npm install', // ToDo: interesting relationship between this, and the build step!
-                    },
-                    build: {
-                      commands: [
-                        'npm run build', // ToDo: here as well!
-                        `npm run cdk deploy -e ${cdk.Stack.of(this).stackName}`,
-                      ],
-                    },
-                  },
-                }),
-              }),
+              project: selfMutationProject,
             }),
           ],
         },
