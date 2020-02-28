@@ -43,7 +43,7 @@ export class CdkPipeline extends cdk.Construct {
           build: {
             commands: [
               'npm run build', // ToDo: here as well!
-              `npm run cdk -- deploy ${pipelineStack.stackName} -e --require-approval=never`,
+              `npm run cdk -- deploy ${pipelineStack.stackName} -e --require-approval=never --verbose`,
             ],
           },
         },
