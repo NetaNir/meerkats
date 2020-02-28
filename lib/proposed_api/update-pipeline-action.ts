@@ -46,9 +46,8 @@ export class UpdatePipelineAction extends Construct implements codepipeline.IAct
           },
           build: {
             commands: [
-              // FIXME: Not '-e', should select stacks in other regions as well
               // Cloud Assembly is in *current* directory.
-              `cdk -a . deploy ${props.pipelineStackName} -e --require-approval=never --verbose`,
+              `cdk -a . deploy ${props.pipelineStackName} --require-approval=never --verbose`,
             ],
           },
         },
