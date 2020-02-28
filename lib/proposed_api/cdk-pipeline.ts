@@ -8,6 +8,7 @@ import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 import { IValidation } from './validation';
 import { PublishAssetsAction } from './publish-assets-action';
+import { UpdatePipelineAction } from './update-pipeline-action';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -32,40 +33,10 @@ export class CdkPipeline extends cdk.Construct {
     const sourceOutput = props.source.actionProperties.outputs![0];
     const buildConfig = props.build.bind(this, { sourceOutput, cloudAssemblyArtifact: this.cloudAssemblyArtifact });
 
+    const vendoredGitHubLocation = `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`;
+    const vendorZipDir = `meerkats-${(process.env.BRANCH || 'master').replace(/\//g, '-')}/vendor`;
+
     const pipelineStack = cdk.Stack.of(this);
-    const selfMutationProject = new codebuild.PipelineProject(this, 'CdkPipelineSelfMutation', {
-      buildSpec: codebuild.BuildSpec.fromObject({
-        version: '0.2',
-        phases: {
-          install: {
-            commands: 'npm install', // ToDo: interesting relationship between this, and the build step!
-          },
-          build: {
-            commands: [
-              'npm run build', // ToDo: here as well!
-              `npm run cdk -- deploy ${pipelineStack.stackName} -e --require-approval=never --verbose`,
-            ],
-          },
-        },
-      }),
-    });
-    const pipelineBootstrapStackActionRole = iam.Role.fromRoleArn(this, 'PipelineBootstrapStackActionRole',
-        `arn:${pipelineStack.partition}:iam::${pipelineStack.account}:role/cdk-bootstrap-deploy-action-role-` +
-        `${pipelineStack.account}-${pipelineStack.region}`);
-    // allow the self-mutating project permissions to assume the bootstrap Action role
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: [pipelineBootstrapStackActionRole.assumeRoleAction],
-      resources: [pipelineBootstrapStackActionRole.roleArn],
-    }));
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['cloudformation:DescribeStacks'],
-      resources: ['*'], // this is needed to check the status of the bootstrap stack when doing `cdk deploy`
-    }));
-    // S3 checks for the presence of the ListBucket permission
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['s3:ListBucket'],
-      resources: ['*'],
-    }));
 
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
@@ -81,21 +52,21 @@ export class CdkPipeline extends cdk.Construct {
         },
         {
           stageName: 'UpdatePipeline',
-          actions: [
-            new cpactions.CodeBuildAction({
-              actionName: 'Self_Mutate',
-              input: sourceOutput,
-              project: selfMutationProject,
-            }),
-          ],
+          actions: [new UpdatePipelineAction(this, 'UpdatePipeline', {
+            cloudAssemblyInput: buildConfig.cdkBuildOutput,
+            // hack hack for experimentation
+            vendoredGitHubLocation,
+            vendorZipDir,
+            pipelineStackName: pipelineStack.stackName,
+          })],
         },
         {
           stageName: 'Assets',
           actions: [new PublishAssetsAction(this, 'PublishAssets', {
             cloudAssemblyInput: buildConfig.cdkBuildOutput,
             // hack hack for experimentation
-            vendoredGitHubLocation: `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`,
-            vendorZipDir: `meerkats-${process.env.BRANCH || 'master'}/vendor`,
+            vendoredGitHubLocation,
+            vendorZipDir,
           })],
         },
       ],
