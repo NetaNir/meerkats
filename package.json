@@ -36,7 +36,12 @@
     "@aws-cdk/aws-iam": "^1.23.0",
     "@aws-cdk/aws-lambda": "^1.23.0",
     "@aws-cdk/core": "^1.23.0",
-    "source-map-support": "^0.5.16"
+    "source-map-support": "^0.5.16",
+    "@aws-cdk/aws-sqs": "^1.26.0",
+    "cdk-watchful": "^0.4.6"
   },
-  "vendorAdditional": ["cdk-assets", "aws-cdk"]
+  "vendorAdditional": [
+    "cdk-assets",
+    "aws-cdk"
+  ]
 }
