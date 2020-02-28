@@ -57,6 +57,10 @@ export class CdkPipeline extends cdk.Construct {
       actions: [pipelineBootstrapStackActionRole.assumeRoleAction],
       resources: [pipelineBootstrapStackActionRole.roleArn],
     }));
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:DescribeStacks'],
+      resources: ['*'], // this is needed to check the status of the bootstrap stack when doing `cdk deploy`
+    }));
 
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
