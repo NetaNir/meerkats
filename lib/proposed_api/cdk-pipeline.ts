@@ -61,6 +61,11 @@ export class CdkPipeline extends cdk.Construct {
       actions: ['cloudformation:DescribeStacks'],
       resources: ['*'], // this is needed to check the status of the bootstrap stack when doing `cdk deploy`
     }));
+    // S3 checks for the presence of the ListBucket permission
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['s3:ListBucket'],
+      resources: ['*'],
+    }));
 
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
