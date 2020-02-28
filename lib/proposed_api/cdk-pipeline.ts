@@ -1,4 +1,6 @@
+import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
@@ -44,10 +46,25 @@ export class CdkPipeline extends cdk.Construct {
         {
           stageName: 'UpdatePipeline',
           actions: [
-            new DeployCdkStackAction({
-              baseActionName: cdk.Stack.of(this).stackName,
-              input: this.cloudAssemblyArtifact,
-              stack: cdk.Stack.of(this),
+            new cpactions.CodeBuildAction({
+              actionName: 'Self_Mutate',
+              input: sourceOutput,
+              project: new codebuild.PipelineProject(this, 'CdkPipelineSelfMutation', {
+                buildSpec: codebuild.BuildSpec.fromObject({
+                  version: '0.2',
+                  phases: {
+                    install: {
+                      commands: 'npm install', // ToDo: interesting relationship between this, and the build step!
+                    },
+                    build: {
+                      commands: [
+                        'npm run build', // ToDo: here as well!
+                        `npm run cdk deploy -e ${cdk.Stack.of(this).stackName}`,
+                      ],
+                    },
+                  },
+                }),
+              }),
             }),
           ],
         },
