@@ -1,10 +1,14 @@
+import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import * as iam from '@aws-cdk/aws-iam';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 import { IValidation } from './validation';
 import { PublishAssetsAction } from './publish-assets-action';
+import { UpdatePipelineAction } from './update-pipeline-action';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -29,6 +33,11 @@ export class CdkPipeline extends cdk.Construct {
     const sourceOutput = props.source.actionProperties.outputs![0];
     const buildConfig = props.build.bind(this, { sourceOutput, cloudAssemblyArtifact: this.cloudAssemblyArtifact });
 
+    const vendoredGitHubLocation = `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`;
+    const vendorZipDir = `meerkats-${(process.env.BRANCH || 'master').replace(/\//g, '-')}/vendor`;
+
+    const pipelineStack = cdk.Stack.of(this);
+
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
       restartExecutionOnUpdate: true,
@@ -43,21 +52,21 @@ export class CdkPipeline extends cdk.Construct {
         },
         {
           stageName: 'UpdatePipeline',
-          actions: [
-            new DeployCdkStackAction({
-              baseActionName: cdk.Stack.of(this).stackName,
-              input: this.cloudAssemblyArtifact,
-              stack: cdk.Stack.of(this),
-            }),
-          ],
+          actions: [new UpdatePipelineAction(this, 'UpdatePipeline', {
+            cloudAssemblyInput: buildConfig.cdkBuildOutput,
+            // hack hack for experimentation
+            vendoredGitHubLocation,
+            vendorZipDir,
+            pipelineStackName: pipelineStack.stackName,
+          })],
         },
         {
           stageName: 'Assets',
           actions: [new PublishAssetsAction(this, 'PublishAssets', {
             cloudAssemblyInput: buildConfig.cdkBuildOutput,
             // hack hack for experimentation
-            vendoredGitHubLocation: `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`,
-            vendorZipDir: `meerkats-${process.env.BRANCH || 'master'}/vendor`,
+            vendoredGitHubLocation,
+            vendorZipDir,
           })],
         },
       ],

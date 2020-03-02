@@ -10,3 +10,4 @@ cdk.out
 .vscode
 yarn-error.log
 .vendor.installed
+/.python-version

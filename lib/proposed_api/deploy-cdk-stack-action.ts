@@ -50,6 +50,8 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
     const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationExecutionRoleArn);
 
+    const actionRegion = this.determineActionsRegion(props);
+
     this._createChangeSetRunOrder = props.baseRunOrder ?? 1;
     const executeChangeSetRunOrder = this._createChangeSetRunOrder + 1;
 
@@ -63,6 +65,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
       adminPermissions: false,
       role: actionRole,
       deploymentRole: cfnDeployRole,
+      region: actionRegion,
       capabilities: [cfn.CloudFormationCapabilities.NAMED_IAM, cfn.CloudFormationCapabilities.AUTO_EXPAND],
     });
     this.executeChangeSetAction = new cpactions.CloudFormationExecuteChangeSetAction({
@@ -71,6 +74,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
       runOrder: executeChangeSetRunOrder,
       stackName: this._stack.stackName,
       role: actionRole,
+      region: actionRegion,
       outputFileName: props.outputFileName,
       output: props.output,
     });
@@ -98,5 +102,9 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     return existingRole
       ? existingRole
       : iam.Role.fromRoleArn(this._stack, id, arn, { mutable: false });
+  }
+
+  private determineActionsRegion(props: DeployCdkStackActionProps): string | undefined {
+    return cdk.Token.isUnresolved(props.stack.region) ? undefined : props.stack.region;
   }
 }

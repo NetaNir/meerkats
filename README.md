@@ -11,7 +11,7 @@ $ yarn install --frozen-lockfile
 $ yarn build
 $ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 $ (optional) export GITHUB_TOKEN=other-github-token-name
-$ (optional) export BRANCH=other-branch-name
+$ (optional) export BRANCH=$(git rev-parse --abbrev-ref HEAD)
 $ npx cdk deploy -e MeertkatsCodePipelineStack
 ```
 
