@@ -39,27 +39,35 @@ export class PipelineStack extends cdk.Stack {
       })
     });
 
-    const euEnv: Environment = {
-      account: '355421412380',
-      region: 'eu-west-1'
-    }
-    const usEnv: Environment = {
+    const betaEnv: Environment = {
       account: '355421412380',
       region: 'us-west-2'
-    }
-    const beta = createStage(scope, usEnv, 'beta', true);
+    };
+    const gammaEnv: Environment = {
+      account: '355421412380',
+      region: 'eu-west-1'
+    };
+    const prodEnv: Environment = {
+      account: '561462023695',
+      region: 'us-east-2'
+    };
 
+    const beta = createStage(scope, betaEnv, 'beta_a1_UsWest2', true);
     pipeline.addCdkStage(beta);
-    const gamma = createStage(scope, euEnv, 'gamma', true);
+
+    const gamma = createStage(scope, gammaEnv, 'gamma_a1_EuWest1', true);
     pipeline.addCdkStage(gamma)
-  };
+
+    const prod = createStage(scope, prodEnv, 'prod_a2_UsEast2', true);
+    pipeline.addCdkStage(prod)
+  }
 }
 
 function createStage(scope: Construct, env: Environment, name: string, addValidation: boolean): CdkStage {
-  const ddbStack = new DDBStack(scope, `Meerkats-DDBStack-${name}`, {
+  const ddbStack = new DDBStack(scope, `Meerkats-DDBStack-${name}`.replace(/_/g, '-'), {
     env
   });
-  const apiGwStack = new APIGWStack(scope, `Meerkats-APIGWStack-${name}`, {
+  const apiGwStack = new APIGWStack(scope, `Meerkats-APIGWStack-${name}`.replace(/_/g, '-'), {
     env,
     table: ddbStack.table
   });
