@@ -19,7 +19,7 @@ export class PipelineStack extends cdk.Stack {
     // (needed for the GitHub source action)
     const gitHubTokenSecretName = process.env.GITHUB_TOKEN || 'my-github-token';
     const pipeline = new CdkPipeline(this, 'Pipeline', {
-      pipelineName: 'MeerkatsPipeline',
+      pipelineName: 'OneMeerkatsPipeline',
       source: new codepipeline_actions.GitHubSourceAction({
         actionName: 'Source_GitHub',
         output: new codepipeline.Artifact(),
