@@ -1,9 +1,7 @@
-import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
-import * as iam from '@aws-cdk/aws-iam';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as cdk from '@aws-cdk/core';
+import * as kms from '@aws-cdk/aws-kms';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 import { IValidation } from './validation';
@@ -16,8 +14,6 @@ export interface CdkPipelineProps {
   readonly build: ICdkBuild;
 
   readonly pipelineName?: string;
-
-  readonly artifactBucket?: s3.IBucket;
 }
 
 export class CdkPipeline extends cdk.Construct {
@@ -27,7 +23,14 @@ export class CdkPipeline extends cdk.Construct {
 
   constructor(scope: cdk.Construct, id: string, props: CdkPipelineProps) {
     super(scope, id);
-
+    // remove the pipeline's key & bucket, to not leave trash in the account
+    const pipelineKey = new kms.Key(scope, 'PipelineKey', {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    const pipelineBucket = new s3.Bucket(scope, 'PipelineBucket', {
+      encryptionKey: pipelineKey,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     this.cloudAssemblyArtifact = new codepipeline.Artifact();
 
     const sourceOutput = props.source.actionProperties.outputs![0];
@@ -171,6 +174,24 @@ export interface CdkStageOptions {
   readonly stageName: string;
   readonly stacks: CdkStack[];
   readonly validations?: IValidation[];
+}
+
+export class CdkStage {
+  readonly stageName: string;
+  readonly stacks: CdkStack[];
+  readonly validations?: IValidation[];
+  stage: codepipeline.IStage;
+
+  constructor(props: CdkStageOptions) {
+    this.stageName = props.stageName;
+    this.stacks = props.stacks;
+    this.validations = props.validations ?? new Array<IValidation>();
+  }
+
+  public addValidations(...validations: IValidation[]) {
+    validations.forEach(v => this.validations?.push(v));
+  }
+
 }
 
 export interface CdkStack {
