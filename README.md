@@ -9,7 +9,7 @@ of it.
 ```
 $ yarn install --frozen-lockfile
 $ yarn build
-$ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
+$ env CDK_NEW_BOOTSTRAP=1 npx cdk bootstrap --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess --trust 355421412380
 $ (optional) export GITHUB_TOKEN=other-github-token-name
 $ (optional) export BRANCH=$(git rev-parse --abbrev-ref HEAD)
 $ npx cdk deploy -e MeertkatsCodePipelineStack
