@@ -69,7 +69,8 @@ function createStage(scope: Construct, env: Environment, name: string, addValida
   });
   const apiGwStack = new APIGWStack(scope, `Meerkats-APIGWStack-${name}`.replace(/_/g, '-'), {
     env,
-    table: ddbStack.table
+    table: ddbStack.table,
+    cluster: ddbStack.cluster,
   });
   // Change this line to 'true' to see synthesis fail with a validation error
   const breakValidation = false;
@@ -95,7 +96,10 @@ function createStage(scope: Construct, env: Environment, name: string, addValida
         'set -e',
         // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
         `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
-        'curl $api_gw_url',
+        // Root URL hits the Lambda
+        'curl -Ssf $api_gw_url',
+        // '/container' hits the container
+        'curl -Ssf $api_gw_url/container',
         ]
       })
     );
