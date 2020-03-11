@@ -7,5 +7,13 @@
     "us-west-2c",
     "us-west-2d"
   ],
-  "aws-cdk:conventionModeDeployments": true
+  "aws-cdk:conventionModeDeployments": true,
+  "availability-zones:account=993655754359:region=us-east-1": [
+    "us-east-1a",
+    "us-east-1b",
+    "us-east-1c",
+    "us-east-1d",
+    "us-east-1e",
+    "us-east-1f"
+  ]
 }

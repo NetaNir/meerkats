@@ -1,12 +1,14 @@
 import * as cdk from '@aws-cdk/core';
 import * as ddb from '@aws-cdk/aws-dynamodb';
-import { IGrantable } from '@aws-cdk/aws-iam';
+import * as ecs from '@aws-cdk/aws-ecs';
+import * as ec2 from '@aws-cdk/aws-ec2';
 
 export interface DDBStackProps extends cdk.StackProps {
 }
 
 export class DDBStack extends cdk.Stack {
   public readonly table: ddb.Table;
+  public readonly cluster: ecs.ICluster;
 
   constructor(scope: cdk.Construct, id: string, props: DDBStackProps = {}) {
     super(scope, id, props);
@@ -17,6 +19,14 @@ export class DDBStack extends cdk.Stack {
         type: ddb.AttributeType.STRING
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const vpc = new ec2.Vpc(this, 'Vpc', {
+      maxAzs: 2,
+    });
+
+    this.cluster = new ecs.Cluster(this, 'Cluster', {
+      vpc,
     });
   }
 }
