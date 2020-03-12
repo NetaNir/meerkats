@@ -43,6 +43,9 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
           },
         },
       }),
+      environment: {
+        privileged: true, // needed to perform Docker builds
+      },
     });
 
     project.addToRolePolicy(new iam.PolicyStatement({
