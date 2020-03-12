@@ -9,10 +9,11 @@ import { CdkBuilds } from "./proposed_api/cdk-build";
 import { CdkPipeline, CdkStack, CdkStage } from "./proposed_api/cdk-pipeline";
 import { DeployCdkStackAction } from "./proposed_api/deploy-cdk-stack-action";
 import { ShellCommandsValidation, IValidation } from './proposed_api/validation';
-import { Environment, Stack, Construct, StackProps } from '@aws-cdk/core';
+import { Environment, Stack, Construct, StackProps, CfnOutput } from '@aws-cdk/core';
+import { MyApplication } from './my-application';
 
 
-export class PipelineStack extends cdk.Stack {
+export class MyPipelineStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: StackProps) {
     super(scope, id, props);
     // allow customizing the SecretsManager GitHub token name
@@ -64,34 +65,26 @@ export class PipelineStack extends cdk.Stack {
 }
 
 function createStage(scope: Construct, env: Environment, name: string, addValidation: boolean): CdkStage {
-  const ddbStack = new DDBStack(scope, `Meerkats-DDBStack-${name}`.replace(/_/g, '-'), {
-    env
-  });
-  const apiGwStack = new APIGWStack(scope, `Meerkats-APIGWStack-${name}`.replace(/_/g, '-'), {
+  const myAppStage = new MyApplication(scope, name, {
     env,
-    table: ddbStack.table,
-    cluster: ddbStack.cluster,
+    prefix: name
   });
+
   // Change this line to 'true' to see synthesis fail with a validation error
   const breakValidation = false;
   const twiddleStacks = breakValidation ? reversed : identity;
-  // this is the artifact that will record the output containing the generated URL of the API Gateway
-  // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
-  const apiGwStackOutputs = new codepipeline.Artifact(`Artifact_${name}_APIGWStack_Output`);
+
+  const { cdkStacks, artifacts } = makeCdkStages(name, myAppStage.deployableStacks, [myAppStage.urlOutput]);
+
   const stage = new CdkStage({
     stageName: name,
-    stacks: twiddleStacks([{
-      stack: ddbStack
-    }, {
-      stack: apiGwStack,
-      outputsArtifact: apiGwStackOutputs
-    }])
+    stacks: twiddleStacks(cdkStacks),
   });
   if (addValidation) {
     stage.addValidations(
       new ShellCommandsValidation({
         name: `IntegTest-${name}`,
-        input: apiGwStackOutputs,
+        input: artifacts[0], // [0] sucks! How do we know which of the potentially 2 artifacts contains the 1 output we need?
         commands: [
         'set -e',
         // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
@@ -124,4 +117,27 @@ function identity<A>(x: A): A {
 function reversed<A>(xs: A[]): A[] {
   xs.reverse();
   return xs;
+}
+
+function makeCdkStages(name: string, stacks: Stack[], interestingOutputs: CfnOutput[]) {
+  const cdkStacks = new Array<CdkStack>();
+  const artifacts = new Array<codepipeline.Artifact>();
+
+  for (const stack of stacks) {
+    const needThisStacksOutput = interestingOutputs.some(output => stacks.includes(Stack.of(output)));
+
+    const artifact = needThisStacksOutput
+      // this is the artifact that will record the output containing the generated URL of the API Gateway
+      // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+      ? new codepipeline.Artifact(`Artifact_${name}_${stack.stackName}_Output`)
+      : undefined;
+
+    if (artifact) {
+      artifacts.push(artifact);
+    }
+
+    cdkStacks.push({ stack, outputsArtifact: artifact });
+  }
+
+  return { cdkStacks, artifacts };
 }
