@@ -10,6 +10,7 @@ import { CdkPipeline, CdkStack, CdkStage } from "./proposed_api/cdk-pipeline";
 import { DeployCdkStackAction } from "./proposed_api/deploy-cdk-stack-action";
 import { ShellCommandsValidation, IValidation } from './proposed_api/validation';
 import { Environment, Stack, Construct, StackProps } from '@aws-cdk/core';
+import { CanaryAspect } from './aspects/canary-aspect';
 
 
 export class PipelineStack extends cdk.Stack {
@@ -53,6 +54,9 @@ export class PipelineStack extends cdk.Stack {
     };
 
     const beta = createStage(scope, betaEnv, 'beta_a1_UsWest2', true);
+    // Creating the aspect here gives us the ability to add an adpect per application stage
+    scope.node.applyAspect(new CanaryAspect(scope, beta));
+
     pipeline.addCdkStage(beta);
 
     const gamma = createStage(scope, gammaEnv, 'gamma_a1_EuWest1', true);
