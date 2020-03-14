@@ -70,7 +70,7 @@ export class APIGWStack extends cdk.Stack {
 
     // add an output with a well-known name to read it from the integ tests
     new cdk.CfnOutput(this, APIGWStack.URL_OUTPUT, {
-      value: `http://${lb.loadBalancerDnsName}/`,
+      value: `http://${lb.loadBalancerDnsName}`,
     });
   }
 }
