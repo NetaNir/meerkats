@@ -24,6 +24,13 @@ export interface StandardBuildOptions {
    * Environment variables to send into build
    */
   readonly environmentVariables?: Record<string, codebuild.BuildEnvironmentVariable>;
+
+  /**
+   * Environment variables to copy over from parent env
+   *
+   * These are environment variables that are being used by the build.
+   */
+  readonly copyEnvironmentVariables?: string[];
 }
 
 export abstract class CdkBuilds {
@@ -50,7 +57,10 @@ export abstract class CdkBuilds {
                   "files": '**/*',
                 },
               }),
-              environmentVariables: buildOptions.environmentVariables
+              environmentVariables: {
+                ...copyEnvironmentVariables(...buildOptions.copyEnvironmentVariables || []),
+                ...buildOptions.environmentVariables
+              },
             }),
             input: options.sourceOutput,
             outputs: [options.cloudAssemblyArtifact],
@@ -88,4 +98,14 @@ export abstract class CdkBuilds {
       }
     };
   }
+}
+
+function copyEnvironmentVariables(...names: string[]): Record<string, codebuild.BuildEnvironmentVariable> {
+  const ret: Record<string, codebuild.BuildEnvironmentVariable> = {};
+  for (const name of names) {
+    if (process.env[name]) {
+      ret[name] = { value: process.env[name] };
+    }
+  }
+  return ret;
 }

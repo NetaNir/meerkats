@@ -1,12 +1,12 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as s3 from '@aws-cdk/aws-s3';
-import * as cdk from '@aws-cdk/core';
 import * as kms from '@aws-cdk/aws-kms';
+import * as s3 from '@aws-cdk/aws-s3';
+import { CfnOutput, Construct, RemovalPolicy, Stack } from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
-import { IValidation } from './validation';
 import { PublishAssetsAction } from './publish-assets-action';
 import { UpdatePipelineAction } from './update-pipeline-action';
+import { IValidation } from './validation';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -16,20 +16,20 @@ export interface CdkPipelineProps {
   readonly pipelineName?: string;
 }
 
-export class CdkPipeline extends cdk.Construct {
+export class CdkPipeline extends Construct {
   public readonly cloudAssemblyArtifact: codepipeline.Artifact;
 
   private readonly pipeline: codepipeline.Pipeline;
 
-  constructor(scope: cdk.Construct, id: string, props: CdkPipelineProps) {
+  constructor(scope: Construct, id: string, props: CdkPipelineProps) {
     super(scope, id);
     // remove the pipeline's key & bucket, to not leave trash in the account
     const pipelineKey = new kms.Key(scope, 'PipelineKey', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     const pipelineBucket = new s3.Bucket(scope, 'PipelineBucket', {
       encryptionKey: pipelineKey,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     this.cloudAssemblyArtifact = new codepipeline.Artifact();
 
@@ -39,7 +39,7 @@ export class CdkPipeline extends cdk.Construct {
     const vendoredGitHubLocation = `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`;
     const vendorZipDir = `meerkats-${(process.env.BRANCH || 'master').replace(/\//g, '-')}/vendor`;
 
-    const pipelineStack = cdk.Stack.of(this);
+    const pipelineStack = Stack.of(this);
 
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
@@ -119,7 +119,7 @@ export class CdkPipeline extends cdk.Construct {
     for (const [thisStackIndex, stackAction] of enumerate(stackActions)) {
       // temporary workaround for the stack dependency problem fixed in https://github.com/aws/aws-cdk/pull/6458
       // just skip the validation for the CodePipeline stack
-      if (stackAction._stack === cdk.Stack.of(this)) {
+      if (stackAction._stack === Stack.of(this)) {
         continue;
       }
 
@@ -177,10 +177,10 @@ export interface CdkStageOptions {
 }
 
 export class CdkStage {
-  readonly stageName: string;
-  readonly stacks: CdkStack[];
-  readonly validations?: IValidation[];
-  stage: codepipeline.IStage;
+  public readonly stageName: string;
+  public readonly stacks: CdkStack[];
+  public readonly validations?: IValidation[];
+  public stage: codepipeline.IStage;
 
   constructor(props: CdkStageOptions) {
     this.stageName = props.stageName;
@@ -198,7 +198,7 @@ export interface CdkStack {
   /**
    * Stack to deploy
    */
-  readonly stack: cdk.Stack;
+  readonly stack: Stack;
 
   /**
    * Store the outputs in this artifact if given
@@ -206,4 +206,45 @@ export interface CdkStack {
    * Filename: 'outputs.json'
    */
   readonly outputsArtifact?: codepipeline.Artifact;
+}
+
+/**
+ * Create a CdkStage from a set of Stack objects and outputs we want to observe
+ */
+export function stageFromStacks(name: string, stacks: Stack[], interestingOutputs: CfnOutput[]) {
+  const cdkStacks = new Array<CdkStack>();
+  const artifacts = new Array<codepipeline.Artifact>();
+
+  for (const stack of stacks) {
+    const needThisStacksOutput = interestingOutputs.some(output => stack === Stack.of(output));
+
+    const artifact = needThisStacksOutput
+      // this is the artifact that will record the output containing the generated URL of the API Gateway
+      // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+      ? new codepipeline.Artifact(`Artifact_${name}_${stack.stackName}_Output`)
+      : undefined;
+
+    if (artifact) {
+      artifacts.push(artifact);
+    }
+
+    cdkStacks.push({ stack, outputsArtifact: artifact });
+  }
+
+  return {
+    artifacts,
+    stage: new CdkStage({
+      stageName: name,
+      stacks: cdkStacks,
+    })
+  };
+}
+
+function identity<A>(x: A): A {
+  return x;
+}
+
+function reversed<A>(xs: A[]): A[] {
+  xs.reverse();
+  return xs;
 }
