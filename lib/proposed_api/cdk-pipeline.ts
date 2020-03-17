@@ -7,6 +7,7 @@ import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 import { IValidation } from './validation';
 import { PublishAssetsAction } from './publish-assets-action';
 import { UpdatePipelineAction } from './update-pipeline-action';
+import { Stack, CfnOutput } from '@aws-cdk/core';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -177,10 +178,10 @@ export interface CdkStageOptions {
 }
 
 export class CdkStage {
-  readonly stageName: string;
-  readonly stacks: CdkStack[];
-  readonly validations?: IValidation[];
-  stage: codepipeline.IStage;
+  public readonly stageName: string;
+  public readonly stacks: CdkStack[];
+  public readonly validations?: IValidation[];
+  public stage: codepipeline.IStage;
 
   constructor(props: CdkStageOptions) {
     this.stageName = props.stageName;
@@ -206,4 +207,45 @@ export interface CdkStack {
    * Filename: 'outputs.json'
    */
   readonly outputsArtifact?: codepipeline.Artifact;
+}
+
+/**
+ * Create a CdkStage from a set of Stack objects and outputs we want to observe
+ */
+export function stageFromStacks(name: string, stacks: Stack[], interestingOutputs: CfnOutput[]) {
+  const cdkStacks = new Array<CdkStack>();
+  const artifacts = new Array<codepipeline.Artifact>();
+
+  for (const stack of stacks) {
+    const needThisStacksOutput = interestingOutputs.some(output => stack === Stack.of(output));
+
+    const artifact = needThisStacksOutput
+      // this is the artifact that will record the output containing the generated URL of the API Gateway
+      // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+      ? new codepipeline.Artifact(`Artifact_${name}_${stack.stackName}_Output`)
+      : undefined;
+
+    if (artifact) {
+      artifacts.push(artifact);
+    }
+
+    cdkStacks.push({ stack, outputsArtifact: artifact });
+  }
+
+  return {
+    artifacts,
+    stage: new CdkStage({
+      stageName: name,
+      stacks: cdkStacks,
+    })
+  };
+}
+
+function identity<A>(x: A): A {
+  return x;
+}
+
+function reversed<A>(xs: A[]): A[] {
+  xs.reverse();
+  return xs;
 }
