@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import * as cdk from '@aws-cdk/core';
 import 'source-map-support/register';
-import { MyPipelineStack } from '../lib/my-pipeline-stack';
 import { MyApplication } from '../lib/my-application';
-import { Stack } from '@aws-cdk/core';
+import { MyPipelineStack } from '../lib/my-pipeline-stack';
 
 const app = new cdk.App();
 
@@ -20,4 +19,3 @@ new MyPipelineStack(app, 'MeertkatsCodePipelineStack', {
 });
 
 app.synth();
- 
