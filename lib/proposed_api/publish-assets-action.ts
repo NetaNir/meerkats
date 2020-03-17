@@ -1,11 +1,8 @@
 import * as codebuild from '@aws-cdk/aws-codebuild';
-import * as cfn from '@aws-cdk/aws-cloudformation';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
-import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
-import * as cdk from '@aws-cdk/core';
 import { Construct } from '@aws-cdk/core';
 
 export interface PublishAssetsActionProps {
@@ -36,6 +33,7 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
         version: '0.2',
         phases: {
           install: {
+            // tslint:disable-next-line:max-line-length
             commands: `(curl -o dl.zip -L "${this.props.vendoredGitHubLocation}" && unzip dl.zip && cd ${this.props.vendorZipDir} && npm install -g *.tgz)`,
           },
           build: {
@@ -57,7 +55,7 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
     });
   }
 
-  public bind(scope: cdk.Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):
+  public bind(scope: Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):
       codepipeline.ActionConfig {
     return this.action.bind(scope, stage, options);
   }

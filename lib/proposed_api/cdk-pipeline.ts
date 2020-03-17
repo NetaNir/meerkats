@@ -1,13 +1,12 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as s3 from '@aws-cdk/aws-s3';
-import * as cdk from '@aws-cdk/core';
 import * as kms from '@aws-cdk/aws-kms';
+import * as s3 from '@aws-cdk/aws-s3';
+import { CfnOutput, Construct, RemovalPolicy, Stack } from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
-import { IValidation } from './validation';
 import { PublishAssetsAction } from './publish-assets-action';
 import { UpdatePipelineAction } from './update-pipeline-action';
-import { Stack, CfnOutput } from '@aws-cdk/core';
+import { IValidation } from './validation';
 
 export interface CdkPipelineProps {
   readonly source: codepipeline.IAction;
@@ -17,20 +16,20 @@ export interface CdkPipelineProps {
   readonly pipelineName?: string;
 }
 
-export class CdkPipeline extends cdk.Construct {
+export class CdkPipeline extends Construct {
   public readonly cloudAssemblyArtifact: codepipeline.Artifact;
 
   private readonly pipeline: codepipeline.Pipeline;
 
-  constructor(scope: cdk.Construct, id: string, props: CdkPipelineProps) {
+  constructor(scope: Construct, id: string, props: CdkPipelineProps) {
     super(scope, id);
     // remove the pipeline's key & bucket, to not leave trash in the account
     const pipelineKey = new kms.Key(scope, 'PipelineKey', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     const pipelineBucket = new s3.Bucket(scope, 'PipelineBucket', {
       encryptionKey: pipelineKey,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     this.cloudAssemblyArtifact = new codepipeline.Artifact();
 
@@ -40,7 +39,7 @@ export class CdkPipeline extends cdk.Construct {
     const vendoredGitHubLocation = `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`;
     const vendorZipDir = `meerkats-${(process.env.BRANCH || 'master').replace(/\//g, '-')}/vendor`;
 
-    const pipelineStack = cdk.Stack.of(this);
+    const pipelineStack = Stack.of(this);
 
     this.pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       ...props,
@@ -120,7 +119,7 @@ export class CdkPipeline extends cdk.Construct {
     for (const [thisStackIndex, stackAction] of enumerate(stackActions)) {
       // temporary workaround for the stack dependency problem fixed in https://github.com/aws/aws-cdk/pull/6458
       // just skip the validation for the CodePipeline stack
-      if (stackAction._stack === cdk.Stack.of(this)) {
+      if (stackAction._stack === Stack.of(this)) {
         continue;
       }
 
@@ -199,7 +198,7 @@ export interface CdkStack {
   /**
    * Stack to deploy
    */
-  readonly stack: cdk.Stack;
+  readonly stack: Stack;
 
   /**
    * Store the outputs in this artifact if given
