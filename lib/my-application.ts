@@ -1,6 +1,7 @@
 import { CfnOutput, Construct, Environment, Stack } from '@aws-cdk/core';
 import { APIGWStack } from './agigw-stack';
 import { DDBStack } from './ddb-stack';
+import { ConstructDomain } from './proposed_api/construct-domain';
 
 export interface MyApplicationProps {
   env: Environment;
@@ -14,8 +15,7 @@ export interface MyApplicationProps {
 /**
  * Deployable unit of my application
  */
-export class MyApplication extends Construct {
-  public readonly deployableStacks: Stack[];
+export class MyApplication extends ConstructDomain {
   public readonly urlOutput: CfnOutput;
 
   constructor(scope: Construct, id: string, props: MyApplicationProps) {
@@ -33,7 +33,5 @@ export class MyApplication extends Construct {
     });
 
     this.urlOutput = apiGwStack.urlOutput;
-
-    this.deployableStacks = [ddbStack, apiGwStack];
   }
 }

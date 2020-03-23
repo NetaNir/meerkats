@@ -5,6 +5,7 @@ import { APIGWStack } from './agigw-stack';
 import { MyApplication } from './my-application';
 import { CdkBuilds } from "./proposed_api/cdk-build";
 import { CdkPipeline, CdkStage, stageFromStacks } from "./proposed_api/cdk-pipeline";
+import { ConstructDomain } from './proposed_api/construct-domain';
 import { ShellCommandsValidation } from './proposed_api/validation';
 
 export class MyPipelineStack extends Stack {
@@ -35,48 +36,34 @@ export class MyPipelineStack extends Stack {
         copyEnvironmentVariables: ['GITHUB_TOKEN', 'BRANCH'],
       })
     });
-
-    pipeline.addCdkStage(createStage(scope, 'beta_a1_UsWest2', {
-      account: '355421412380',
-      region: 'us-west-2'
-    }));
-
-    pipeline.addCdkStage(createStage(scope, 'gamma_a1_EuWest1', {
-      account: '355421412380',
-      region: 'eu-west-1'
-    }));
-
-    pipeline.addCdkStage(createStage(scope, 'prod_a2_UsEast2', {
-      account: '561462023695',
-      region: 'us-east-2'
-    }));
   }
-}
 
-function createStage(scope: Construct, name: string, env: Environment, addValidation = true): CdkStage {
-  const myAppStage = new MyApplication(scope, name, {
-    env,
-    prefix: name
-  });
+  public addStage(stageName: string, domain: ConstructDomain) {
+    domain.lock();
 
-  const { stage, artifacts } = stageFromStacks(name, myAppStage.deployableStacks, [myAppStage.urlOutput]);
+    const { stage, artifacts } = stageFromStacks(stageName, domain.stacks, []);
 
-  if (addValidation) {
-    stage.addValidations(
-      new ShellCommandsValidation({
-        name: `IntegTest-${name}`,
-        input: artifacts[0], // [0] sucks! How do we know which of the potentially 2 artifacts contains the 1 output we need?
-        commands: [
-        'set -e',
-        // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
-        `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
-        // Root URL hits the Lambda
-        'curl -Ssf $api_gw_url',
-        // '/container' hits the container
-        'curl -Ssf $api_gw_url/container',
-        ]
-      })
-    );
+    /*
+    const { stage, artifacts } = stageFromStacks(stageName, domain.stacks, [myAppStage.urlOutput]);
+
+    if (addValidation) {
+      stage.addValidations(
+        new ShellCommandsValidation({
+          name: `IntegTest-${name}`,
+          input: artifacts[0], // [0] sucks! How do we know which of the potentially 2 artifacts contains the 1 output we need?
+          commands: [
+          'set -e',
+          // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
+          `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
+          // Root URL hits the Lambda
+          'curl -Ssf $api_gw_url',
+          // '/container' hits the container
+          'curl -Ssf $api_gw_url/container',
+          ]
+        })
+      );
+    }
+    */
+    return stage;
   }
-  return stage;
 }
