@@ -1,5 +1,6 @@
 *.js
 !lib/lambda/*.js
+!lib/canaries/canary-lambda/*.js
 !jest.config.js
 *.d.ts
 node_modules
