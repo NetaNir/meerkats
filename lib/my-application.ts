@@ -1,5 +1,6 @@
 import { CfnOutput, Construct, Environment, Stack } from '@aws-cdk/core';
 import { APIGWStack } from './agigw-stack';
+import { CanaryAspect } from './aspects/canary-aspect';
 import { DDBStack } from './ddb-stack';
 import { ConstructDomain } from './proposed_api/construct-domain';
 
@@ -31,6 +32,7 @@ export class MyApplication extends ConstructDomain {
       cluster: ddbStack.cluster,
       stackName: `${props.prefix}-APIGWStack`.replace(/_/g, '-'),
     });
+    this.node.applyAspect(new CanaryAspect(this, props.env));
 
     this.urlOutput = apiGwStack.urlOutput;
   }
