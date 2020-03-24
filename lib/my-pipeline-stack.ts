@@ -6,6 +6,7 @@ import { MyApplication } from './my-application';
 import { CdkBuilds } from "./proposed_api/cdk-build";
 import { CdkPipeline, CdkStage, stageFromStacks } from "./proposed_api/cdk-pipeline";
 import { ShellCommandsValidation } from './proposed_api/validation';
+import { CanaryAspect } from './aspects/canary-aspect';
 
 export class MyPipelineStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
@@ -60,6 +61,7 @@ function createStage(scope: Construct, name: string, env: Environment, addValida
   });
 
   const { stage, artifacts } = stageFromStacks(name, myAppStage.deployableStacks, [myAppStage.urlOutput]);
+  myAppStage.node.applyAspect(new CanaryAspect(myAppStage, env));
 
   if (addValidation) {
     stage.addValidations(
