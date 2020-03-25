@@ -1,30 +1,47 @@
 import codebuild = require('@aws-cdk/aws-codebuild');
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import { Construct } from '@aws-cdk/core';
+import { CfnOutput, Construct } from '@aws-cdk/core';
 
 export interface ProduceActionOptions {
   readonly runOrder: number;
+  readonly inputs: ValidationInput[];
+}
+
+export interface ValidationInput {
+  output: CfnOutput;
+  artifact: codepipeline.Artifact;
+  artifactFilename: string;
 }
 
 export interface IValidation {
+  readonly outputsRequired: CfnOutput[];
+
   produceAction(scope: Construct, options: ProduceActionOptions): codepipeline.IAction;
 }
 
 export interface ShellCommandsValidationProps {
   readonly name: string;
-  readonly input: codepipeline.Artifact; // FIXME: A CodeBuildAction has required input???
+  readonly envVars: Record<string, CfnOutput>;
   readonly commands: string[];
 }
 
 export class ShellCommandsValidation implements IValidation {
+  public readonly outputsRequired: CfnOutput[];
+
   constructor(private readonly props: ShellCommandsValidationProps) {
+    this.outputsRequired = Object.values(props.envVars ?? {});
   }
 
   public produceAction(scope: Construct, options: ProduceActionOptions): codepipeline.IAction {
+    const artifacts = options.inputs.map(i => i.artifact);
+    if (new Set(artifacts).size > 1) {
+      throw new Error('ShellCommandsValidation only supports outputs from 1 stack (for now)');
+    }
+
     return new codepipeline_actions.CodeBuildAction({
       actionName: this.props.name,
-      input: this.props.input,
+      input: artifacts[0],
       runOrder: options.runOrder,
       project: new codebuild.PipelineProject(scope, this.props.name, {
         buildSpec: codebuild.BuildSpec.fromObject({

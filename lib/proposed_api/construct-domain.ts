@@ -11,6 +11,13 @@ export class ConstructDomain extends Construct {
     ConstructNode.prepare(this.node);
     (this.node as any)._lock();
     this.locked = true;
+
+    // COMPLICATION: Make sure that no construct in this subtree prepare()s twice.
+    for (const construct of this.node.findAll()) {
+      (construct as any).prepare = nop;
+    }
+
+    function nop() { /* Empty on purpose */ }
   }
 
   public get stacks(): Stack[] {

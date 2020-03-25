@@ -1,14 +1,13 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import { Construct, Environment, SecretValue, Stack, StackProps } from '@aws-cdk/core';
-import { APIGWStack } from './agigw-stack';
-import { MyApplication } from './my-application';
+import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
 import { CdkBuilds } from "./proposed_api/cdk-build";
-import { CdkPipeline, CdkStage, stageFromStacks } from "./proposed_api/cdk-pipeline";
+import { CdkPipeline } from "./proposed_api/cdk-pipeline";
 import { ConstructDomain } from './proposed_api/construct-domain';
-import { ShellCommandsValidation } from './proposed_api/validation';
 
 export class MyPipelineStack extends Stack {
+  private pipeline: CdkPipeline;
+
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
 
@@ -16,7 +15,7 @@ export class MyPipelineStack extends Stack {
     // (needed for the GitHub source action)
     const gitHubTokenSecretName = process.env.GITHUB_TOKEN || 'my-github-token';
 
-    const pipeline = new CdkPipeline(this, 'Pipeline', {
+    this.pipeline = new CdkPipeline(this, 'Pipeline', {
       pipelineName: 'OneMeerkatsPipeline',
 
       source: new codepipeline_actions.GitHubSourceAction({
@@ -40,30 +39,6 @@ export class MyPipelineStack extends Stack {
 
   public addStage(stageName: string, domain: ConstructDomain) {
     domain.lock();
-
-    const { stage, artifacts } = stageFromStacks(stageName, domain.stacks, []);
-
-    /*
-    const { stage, artifacts } = stageFromStacks(stageName, domain.stacks, [myAppStage.urlOutput]);
-
-    if (addValidation) {
-      stage.addValidations(
-        new ShellCommandsValidation({
-          name: `IntegTest-${name}`,
-          input: artifacts[0], // [0] sucks! How do we know which of the potentially 2 artifacts contains the 1 output we need?
-          commands: [
-          'set -e',
-          // take out the URL of the API Gateway from the outputs.json file produced by the previous CFN deploy Action
-          `api_gw_url=$(node -e 'console.log(require("./outputs.json")["${APIGWStack.URL_OUTPUT}"]);')`,
-          // Root URL hits the Lambda
-          'curl -Ssf $api_gw_url',
-          // '/container' hits the container
-          'curl -Ssf $api_gw_url/container',
-          ]
-        })
-      );
-    }
-    */
-    return stage;
+    return this.pipeline.addCdkStage(stageName, domain.stacks);
   }
 }

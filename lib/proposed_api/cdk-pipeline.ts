@@ -5,6 +5,7 @@ import { CfnOutput, Construct, RemovalPolicy, Stack } from '@aws-cdk/core';
 import { ICdkBuild } from "./cdk-build";
 import { DeployCdkStackAction } from "./deploy-cdk-stack-action";
 import { PublishAssetsAction } from './publish-assets-action';
+import { topologicalSort } from './toposort';
 import { UpdatePipelineAction } from './update-pipeline-action';
 import { IValidation } from './validation';
 
@@ -76,40 +77,10 @@ export class CdkPipeline extends Construct {
     });
   }
 
-  public addStage(stageOptions: codepipeline.StageOptions): codepipeline.IStage {
-    return this.pipeline.addStage(stageOptions);
-  }
+  public addCdkStage(stageName: string, stacks: Stack[]): CdkStage {
+    const sorted = topoSortStacks(stacks);
 
-  public addCdkStage(stageOptions: CdkStageOptions): codepipeline.IStage {
-    let runOrder = 1;
-
-    const actions: codepipeline.IAction[] = stageOptions.stacks.map((stack, i) => {
-      try {
-        return new DeployCdkStackAction({
-          baseActionName: stack.stack.stackName,
-          input: this.cloudAssemblyArtifact,
-          stack: stack.stack,
-          output: stack.outputsArtifact,
-          outputFileName: stack.outputsArtifact ? 'outputs.json' : undefined,
-          baseRunOrder: runOrder,
-        });
-      } finally {
-        runOrder += 2; // Ew
-      }
-    });
-
-    for (const validation of stageOptions.validations || []) {
-      actions.push(validation.produceAction(this, {
-        runOrder,
-      }));
-      runOrder += 1;
-
-    }
-
-    return this.pipeline.addStage({
-      stageName: stageOptions.stageName,
-      actions,
-    });
+    return new CdkStage(this, stageName, this.cloudAssemblyArtifact, this.pipeline.addStage({ stageName }), sorted);
   }
 
   protected validate(): string[] {
@@ -171,27 +142,72 @@ function flatMap<A, B>(xs: A[], f: (x: A) => B[]): B[] {
 }
 
 export interface CdkStageOptions {
-  readonly stageName: string;
-  readonly stacks: CdkStack[];
-  readonly validations?: IValidation[];
+  readonly pipelineStage: codepipeline.IStage;
 }
 
-export class CdkStage {
-  public readonly stageName: string;
-  public readonly stacks: CdkStack[];
-  public readonly validations?: IValidation[];
-  public stage: codepipeline.IStage;
+export class CdkStage extends Construct {
+  private validations: IValidation[] = [];
 
-  constructor(props: CdkStageOptions) {
-    this.stageName = props.stageName;
-    this.stacks = props.stacks;
-    this.validations = props.validations ?? new Array<IValidation>();
+  constructor(
+    scope: Construct,
+    id: string,
+    private readonly cloudAssemblyArtifact: codepipeline.Artifact,
+    private readonly pipelineStage: codepipeline.IStage,
+    private readonly stacks: Stack[]) {
+    super(scope, id);
   }
 
   public addValidations(...validations: IValidation[]) {
-    validations.forEach(v => this.validations?.push(v));
+    this.validations.push(...validations);
   }
 
+  protected prepare() {
+    // COMPLICATION: Need to build the actual stage here, because all the CodePipeline
+    // Actions are immutable so we have to build them in one shot.
+    let runOrder = 1;
+    const cdkStacks = new Array<CdkStack>();
+    const artifacts = new Map<Stack, codepipeline.Artifact>();
+
+    const interestingOutputs = flatten(this.validations.map(v => v.outputsRequired));
+
+    for (const stack of this.stacks) {
+      const needThisStacksOutput = interestingOutputs.some(output => stack === Stack.of(output));
+
+      const artifact = needThisStacksOutput
+        // this is the artifact that will record the output containing the generated URL of the API Gateway
+        // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
+        ? new codepipeline.Artifact(`Artifact_${this.pipelineStage.stageName}_${stack.stackName}_Output`)
+        : undefined;
+
+      if (artifact) {
+        artifacts.set(stack, artifact);
+      }
+
+      this.pipelineStage.addAction(new DeployCdkStackAction(this, {
+        baseActionName: stack.stackName,
+        input: this.cloudAssemblyArtifact,
+        stack,
+        output: artifact,
+        outputFileName: artifact ? 'outputs.json' : undefined,
+        baseRunOrder: runOrder,
+      }));
+
+      runOrder += 2;
+    }
+
+    for (const validation of this.validations) {
+      this.pipelineStage.addAction(validation.produceAction(this, {
+        inputs: validation.outputsRequired.map(output => ({
+          output,
+          artifact: artifacts.get(Stack.of(output))!,
+          artifactFilename: 'outputs.json',
+        })),
+        runOrder,
+      }));
+
+      runOrder += 1;
+    }
+  }
 }
 
 export interface CdkStack {
@@ -208,43 +224,12 @@ export interface CdkStack {
   readonly outputsArtifact?: codepipeline.Artifact;
 }
 
-/**
- * Create a CdkStage from a set of Stack objects and outputs we want to observe
- */
-export function stageFromStacks(name: string, stacks: Stack[], interestingOutputs: CfnOutput[]) {
-  const cdkStacks = new Array<CdkStack>();
-  const artifacts = new Array<codepipeline.Artifact>();
-
-  for (const stack of stacks) {
-    const needThisStacksOutput = interestingOutputs.some(output => stack === Stack.of(output));
-
-    const artifact = needThisStacksOutput
-      // this is the artifact that will record the output containing the generated URL of the API Gateway
-      // Need to explicitly name it because the stage name contains a '.' and that's not allowed to be in the artifact name.
-      ? new codepipeline.Artifact(`Artifact_${name}_${stack.stackName}_Output`)
-      : undefined;
-
-    if (artifact) {
-      artifacts.push(artifact);
-    }
-
-    cdkStacks.push({ stack, outputsArtifact: artifact });
-  }
-
-  return {
-    artifacts,
-    stage: new CdkStage({
-      stageName: name,
-      stacks: cdkStacks,
-    })
-  };
+function topoSortStacks(stacks: Stack[]) {
+  return topologicalSort(stacks,
+    s => s.node.path,
+    s => s.dependencies.map(d => d.node.path));
 }
 
-function identity<A>(x: A): A {
-  return x;
-}
-
-function reversed<A>(xs: A[]): A[] {
-  xs.reverse();
-  return xs;
+function flatten<A>(xs: A[][]): A[] {
+  return Array.prototype.concat.apply([], xs);
 }
