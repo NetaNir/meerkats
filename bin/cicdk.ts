@@ -7,10 +7,15 @@ import { App } from '../lib/proposed_api/app';
 
 const app = new App();
 
-new MyApplication(app, 'DevApp', {
+const dev = new MyApplication(app, 'DevApp', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   prefix: 'Dev',
 });
+
+const devPipeline = new MyPipelineStack(app, 'DevPipelineStack', {
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+});
+devPipeline.addStage('Dev', dev).addValidations(new MyIntegTest('DevTest', dev));
 
 const pipeline = new MyPipelineStack(app, 'MeertkatsCodePipelineStack', {
   env: { account: '355421412380', region: 'us-west-2' },
