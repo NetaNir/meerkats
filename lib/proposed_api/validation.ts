@@ -39,6 +39,17 @@ export class ShellCommandsValidation implements IValidation {
       throw new Error('ShellCommandsValidation only supports outputs from 1 stack (for now)');
     }
 
+    const envVarCommands = new Array<string>();
+    envVarCommands.push('set -e');
+    for (const [varName, output] of Object.entries(this.outputsRequired)) {
+      const theInput = options.inputs.find(input => input.output === output);
+      if (!theInput) {
+        throw new Error('Uhh');
+      }
+
+      envVarCommands.push(`export ${varName}=$(node -pe 'require("./${theInput.artifactFilename}")["${theInput.output.logicalId}"]')`);
+    }
+
     return new codepipeline_actions.CodeBuildAction({
       actionName: this.props.name,
       input: artifacts[0],

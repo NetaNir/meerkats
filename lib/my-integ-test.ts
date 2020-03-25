@@ -9,7 +9,6 @@ export class MyIntegTest extends ShellCommandsValidation {
         API_GW_URL: app.urlOutput,
       },
       commands: [
-        'set -e',
         // Root URL hits the Lambda
         'curl -Ssf $API_GW_URL',
         // '/container' hits the container
