@@ -18,7 +18,7 @@ export class CanaryAspect implements IAspect {
   
   getCanaryStack(node: IConstruct): Stack {
     let suffix = this.scope.node.uniqueId;
-    // verify the satck has not been created in the scope
+    // verify the stack has not been created in the scope
     const stackNode = this.scope.node.tryFindChild(`CanaryStack-${suffix}`);
     if (stackNode) {
       return (stackNode as Stack);
