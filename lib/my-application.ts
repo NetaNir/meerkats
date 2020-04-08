@@ -1,6 +1,5 @@
-import { CfnOutput, Construct, Environment, Stack } from '@aws-cdk/core';
+import { CfnOutput, Construct, Environment } from '@aws-cdk/core';
 import { AppStack } from './app-stack';
-import { CanaryAspect } from './aspects/canary-aspect';
 import { ConstructDomain as Application } from './proposed_api/construct-domain';
 import { SharedStack } from './shared-stack';
 
@@ -31,7 +30,6 @@ export class MyApplication extends Application {
       cluster: sharedStack.cluster,
       stackName: 'Application',
     });
-    this.node.applyAspect(new CanaryAspect(this, props.env));
 
     this.urlOutput = appStack.urlOutput;
   }

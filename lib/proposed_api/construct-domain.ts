@@ -9,7 +9,6 @@ export class ConstructDomain extends Construct {
 
   public lock() {
     ConstructNode.prepare(this.node);
-    (this.node as any)._lock();
     this.locked = true;
 
     // COMPLICATION: Make sure that no construct in this subtree prepare()s twice.

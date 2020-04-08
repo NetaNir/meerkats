@@ -11,15 +11,17 @@ export class MyPipelineStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
 
+    process.env.BRANCH = 'huijbers/demo';
+
     // allow customizing the SecretsManager GitHub token name
     // (needed for the GitHub source action)
     const gitHubTokenSecretName = process.env.GITHUB_TOKEN || 'my-github-token';
 
     this.pipeline = new CdkPipeline(this, 'Pipeline', {
-      pipelineName: 'OneMeerkatsPipeline',
+      pipelineName: 'DemoPipeline',
 
       source: new codepipeline_actions.GitHubSourceAction({
-        actionName: 'Source_GitHub',
+        actionName: 'GitHub',
         output: new codepipeline.Artifact(),
         oauthToken: SecretValue.secretsManager(gitHubTokenSecretName),
         owner: 'NetaNir',
@@ -37,8 +39,8 @@ export class MyPipelineStack extends Stack {
     });
   }
 
-  public addStage(stageName: string, domain: ConstructDomain) {
+  public addStage(domain: ConstructDomain) {
     domain.lock();
-    return this.pipeline.addCdkStage(stageName, domain.stacks);
+    return this.pipeline.addCdkStage(domain.node.id, domain.stacks);
   }
 }
