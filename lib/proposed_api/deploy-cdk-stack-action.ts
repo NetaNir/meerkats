@@ -100,15 +100,28 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   private getActionRole(scope: cdk.Construct, envRoleType: string, arn: string | undefined): iam.IRole | undefined {
     if (!arn) { return undefined; }
 
-    const id = [envRoleType,
-      cdk.Token.isUnresolved(this._stack.region) ? this._stack.region : 'REGION',
-      cdk.Token.isUnresolved(this._stack.account) ? this._stack.account : 'ACCOUNT',
-    ].join('-');
+    // FIXME: for now, MUST create the imported role construct under the stack
+    // we're deploying, otherwise the CodePipeline won't detect the cross-accountness
+    // of the role and generate the proper policies.
 
-    const existingRole = scope.node.tryFindChild(id) as iam.IRole;
-    return existingRole
-      ? existingRole
-      : iam.Role.fromRoleArn(scope, id, arn, { mutable: false });
+    let id;
+    let theScope;
+    if (false) {
+      id = [envRoleType,
+        cdk.Token.isUnresolved(this._stack.region) ? this._stack.region : 'REGION',
+        cdk.Token.isUnresolved(this._stack.account) ? this._stack.account : 'ACCOUNT',
+      ].join('-');
+
+      theScope = scope;
+    } else {
+      id = envRoleType;
+      theScope = this._stack;
+    }
+    // https://github.com/aws/aws-cdk/issues/7255
+    const existingRole = theScope.node.tryFindChild(`ImmutableRole${id}`) as iam.IRole;
+    if (existingRole) { return existingRole; }
+
+    return iam.Role.fromRoleArn(theScope, id, arn, { mutable: false });
   }
 
   private determineActionsRegion(props: DeployCdkStackActionProps): string | undefined {

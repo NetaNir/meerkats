@@ -18,4 +18,8 @@ pipeline.addStage(new MyApplication(app, 'Beta', {
   env: { account: '355421412380', region: 'eu-west-1' },
 }));
 
+pipeline.addStage(new MyApplication(app, 'Gamma', {
+  env: { account: '561462023695', region: 'us-east-2' },
+}));
+
 app.synth();
