@@ -15,6 +15,7 @@ export class ConstructDomain extends Construct {
     // COMPLICATION: Make sure that no construct in this subtree prepare()s twice.
     for (const construct of this.node.findAll()) {
       (construct as any).prepare = nop;
+      (construct as any).node._aspects = [];
     }
 
     function nop() { /* Empty on purpose */ }
