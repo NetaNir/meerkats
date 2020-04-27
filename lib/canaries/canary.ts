@@ -24,7 +24,7 @@ export class Canary extends Construct {
     
     // create a cloudwatch event rule 
     const rule = new events.Rule(this, 'CanaryRule', {
-      schedule: events.Schedule.expression('rate(5 minutes)'),
+      schedule: events.Schedule.expression('rate(10 minutes)'),
       targets: [ new targets.LambdaFunction(canaryLambda) ] 
     });
     
