@@ -1,39 +1,36 @@
-import { CfnOutput, Construct, Environment, Stack } from '@aws-cdk/core';
-import { APIGWStack } from './agigw-stack';
-import { DDBStack } from './ddb-stack';
+import { CfnOutput, Construct, Environment } from '@aws-cdk/core';
+import { AppStack } from './app-stack';
+import { ConstructDomain as Application } from './proposed_api/construct-domain';
+import { SharedStack } from './shared-stack';
 
 export interface MyApplicationProps {
   env: Environment;
-
-  /**
-   * Prefix for stack names
-   */
-  prefix: string;
 }
 
 /**
  * Deployable unit of my application
  */
-export class MyApplication extends Construct {
-  public readonly deployableStacks: Stack[];
+export class MyApplication extends Application {
+  /**
+   * Output that holds the URL of the load balancer
+   */
   public readonly urlOutput: CfnOutput;
 
   constructor(scope: Construct, id: string, props: MyApplicationProps) {
     super(scope, id);
 
-    const ddbStack = new DDBStack(this, 'DDBStack', {
+    const sharedStack = new SharedStack(this, 'SharedStack', {
       env: props.env,
-      stackName: `${props.prefix}-DDBStack`.replace(/_/g, '-'),
-    });
-    const apiGwStack = new APIGWStack(this, 'APIGWStack', {
-      env: props.env,
-      table: ddbStack.table,
-      cluster: ddbStack.cluster,
-      stackName: `${props.prefix}-APIGWStack`.replace(/_/g, '-'),
+      stackName: 'Shared',
     });
 
-    this.urlOutput = apiGwStack.urlOutput;
+    const appStack = new AppStack(this, 'AppStack', {
+      env: props.env,
+      table: sharedStack.table,
+      cluster: sharedStack.cluster,
+      stackName: 'Application',
+    });
 
-    this.deployableStacks = [ddbStack, apiGwStack];
+    this.urlOutput = appStack.urlOutput;
   }
 }

@@ -18,7 +18,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             <body>
                 <h1>Hello from a Docker container</h1>
                 <p>This container got built from an asset and runs on Fargate.</p>
-                <img src="https://media.giphy.com/media/nFjDu1LjEADh6/giphy.gif">
+                <img src="https://media.giphy.com/media/Zaej3GIZTzCI8/giphy.gif">
             </body>
             ''').encode('utf-8'))
 

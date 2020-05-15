@@ -1,12 +1,12 @@
-import * as cdk from '@aws-cdk/core';
 import * as ddb from '@aws-cdk/aws-dynamodb';
-import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
+import * as ecs from '@aws-cdk/aws-ecs';
+import * as cdk from '@aws-cdk/core';
 
 export interface DDBStackProps extends cdk.StackProps {
 }
 
-export class DDBStack extends cdk.Stack {
+export class SharedStack extends cdk.Stack {
   public readonly table: ddb.Table;
   public readonly cluster: ecs.ICluster;
 

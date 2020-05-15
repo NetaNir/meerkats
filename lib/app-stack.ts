@@ -11,7 +11,7 @@ export interface APIGWStackProps extends cdk.StackProps {
   readonly cluster: ecs.ICluster;
 }
 
-export class APIGWStack extends cdk.Stack {
+export class AppStack extends cdk.Stack {
   public static readonly URL_OUTPUT = 'MeerkatApiGwUrlOutput';
 
   public readonly handler: lambda.Function;
@@ -24,11 +24,10 @@ export class APIGWStack extends cdk.Stack {
     this.handler = new lambda.Function(this, 'MeerkatLambda', {
       runtime: lambda.Runtime.NODEJS_12_X,
       handler: 'meerkat-lambda.handler',
-      code: lambda.Code.fromAsset(path.resolve(__dirname, "./lambda")),
+      code: lambda.Code.fromAsset(path.resolve(__dirname, 'lambda')),
       environment: {
         TABLE_NAME: props.table.tableName,
       },
-      description: 'Fake description to force a redeploy of the stack.',
     });
     props.table.grantFullAccess(this.handler);
 
@@ -39,7 +38,7 @@ export class APIGWStack extends cdk.Stack {
     });
 
     const container = taskDefinition.addContainer('web', {
-      image: ecs.ContainerImage.fromAsset(path.join(__dirname, '..', 'container')),
+      image: ecs.ContainerImage.fromAsset(path.join(__dirname, 'container')),
     });
 
     container.addPortMappings({
@@ -68,7 +67,7 @@ export class APIGWStack extends cdk.Stack {
     });
 
     // add an output with a well-known name to read it from the integ tests
-    this.urlOutput = new cdk.CfnOutput(this, APIGWStack.URL_OUTPUT, {
+    this.urlOutput = new cdk.CfnOutput(this, AppStack.URL_OUTPUT, {
       value: `http://${lb.loadBalancerDnsName}`,
     });
   }

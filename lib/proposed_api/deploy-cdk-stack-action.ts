@@ -37,7 +37,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
 
-  constructor(props: DeployCdkStackActionProps) {
+  constructor(scope: cdk.Construct, props: DeployCdkStackActionProps) {
     this._stack = props.stack;
 
     const deployConfig = props.stack.deploymentEnvironment.stackDeploymentConfig(cdk.ConfigVariant.CLOUDFORMATION);
@@ -47,8 +47,10 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     }
 
     // the bootstrap roles
-    const actionRole = this.getActionRole(DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
-    const cfnDeployRole = this.getActionRole(DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationExecutionRoleArn);
+    // COMPLICATION: we can't create them under the target Stacks anymore because
+    // those are immutable now, so we need a scope to create them.
+    const actionRole = this.getActionRole(scope, DeployCdkStackAction.ACTION_ROLE_ID, deployConfig.assumeRoleArn);
+    const cfnDeployRole = this.getActionRole(scope, DeployCdkStackAction.DEPLOY_ROLE_ID, deployConfig.cloudFormationExecutionRoleArn);
 
     const actionRegion = this.determineActionsRegion(props);
 
@@ -95,13 +97,31 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     return this.executeChangeSetAction.actionProperties;
   }
 
-  private getActionRole(id: string, arn: string | undefined): iam.IRole | undefined {
+  private getActionRole(scope: cdk.Construct, envRoleType: string, arn: string | undefined): iam.IRole | undefined {
     if (!arn) { return undefined; }
 
-    const existingRole = this._stack.node.tryFindChild(id) as iam.IRole;
-    return existingRole
-      ? existingRole
-      : iam.Role.fromRoleArn(this._stack, id, arn, { mutable: false });
+    // FIXME: for now, MUST create the imported role construct under the stack
+    // we're deploying, otherwise the CodePipeline won't detect the cross-accountness
+    // of the role and generate the proper policies.
+
+    let id;
+    let theScope;
+    if (false) {
+      id = [envRoleType,
+        cdk.Token.isUnresolved(this._stack.region) ? this._stack.region : 'REGION',
+        cdk.Token.isUnresolved(this._stack.account) ? this._stack.account : 'ACCOUNT',
+      ].join('-');
+
+      theScope = scope;
+    } else {
+      id = envRoleType;
+      theScope = this._stack;
+    }
+    // https://github.com/aws/aws-cdk/issues/7255
+    const existingRole = theScope.node.tryFindChild(`ImmutableRole${id}`) as iam.IRole;
+    if (existingRole) { return existingRole; }
+
+    return iam.Role.fromRoleArn(theScope, id, arn, { mutable: false });
   }
 
   private determineActionsRegion(props: DeployCdkStackActionProps): string | undefined {
