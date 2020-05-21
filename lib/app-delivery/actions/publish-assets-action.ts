@@ -1,11 +1,16 @@
 import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
-import { Construct } from '@aws-cdk/core';
+import { Construct, Lazy } from '@aws-cdk/core';
 
-export interface UpdatePipelineActionProps {
+export interface PublishAssetsActionProps {
+  /**
+   * Name of publishing action
+   */
+  readonly actionName: string;
+
   /**
    * The CodePipeline artifact that holds the Cloud Assembly.
    */
@@ -20,57 +25,53 @@ export interface UpdatePipelineActionProps {
    * Dir in the zip with vendored NPM packages
    */
   readonly vendorZipDir: string;
-
-  /**
-   * Name of the pipeline stack
-   */
-  readonly pipelineStackName: string;
 }
 
-export class UpdatePipelineAction extends Construct implements codepipeline.IAction {
+export class PublishAssetsAction extends Construct implements codepipeline.IAction {
   private readonly action: codepipeline.IAction;
+  private readonly commands = new Array<string>();
 
-  constructor(scope: Construct, id: string, private readonly props: UpdatePipelineActionProps) {
+  constructor(scope: Construct, id: string, private readonly props: PublishAssetsActionProps) {
     super(scope, id);
 
-    const selfMutationProject = new codebuild.PipelineProject(this, 'CdkPipelineSelfMutation', {
+    const project = new codebuild.PipelineProject(scope, 'Default', {
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
           install: {
-            // commands: 'npm install -g aws-cdk',
             // tslint:disable-next-line:max-line-length
             commands: `(curl -o dl.zip -L "${this.props.vendoredGitHubLocation}" && unzip dl.zip && cd ${this.props.vendorZipDir} && npm install -g *.tgz)`,
           },
           build: {
-            commands: [
-              // Cloud Assembly is in *current* directory.
-              `cdk -a . deploy ${props.pipelineStackName} --require-approval=never --verbose`,
-            ],
+            commands: Lazy.listValue({ produce: () => this.commands }),
           },
         },
       }),
+      environment: {
+        privileged: true, // needed to perform Docker builds
+      },
     });
 
-    // allow the self-mutating project permissions to assume the bootstrap Action role
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: ["sts:AssumeRole"],
-      resources: ['arn:*:iam::*:role/*-deploy-action-role-*', 'arn:*:iam::*:role/*-publishing-role-*'],
+    project.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['sts:AssumeRole'],
+      resources: ['arn:*:iam::*:role/*-publishing-role-*'],
     }));
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['cloudformation:DescribeStacks'],
-      resources: ['*'], // this is needed to check the status of the bootstrap stack when doing `cdk deploy`
-    }));
-    // S3 checks for the presence of the ListBucket permission
-    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['s3:ListBucket'],
-      resources: ['*'],
-    }));
-    this.action = new cpactions.CodeBuildAction({
-      actionName: 'SelfMutate',
-      input: props.cloudAssemblyInput,
-      project: selfMutationProject,
+
+    this.action = new codepipeline_actions.CodeBuildAction({
+      actionName: props.actionName,
+      project,
+      input: this.props.cloudAssemblyInput,
     });
+  }
+
+  /**
+   * Add a single publishing command
+   */
+  public addPublishCommand(relativeManifestPath: string, assetSelector: string) {
+    const command = `cdk-assets --path "${relativeManifestPath}" --verbose publish "${assetSelector}"`;
+    if (!this.commands.includes(command)) {
+      this.commands.push(command);
+    }
   }
 
   public bind(scope: Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):

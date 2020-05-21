@@ -1,23 +1,19 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
-import { CdkBuilds } from "./proposed_api/cdk-build";
-import { CdkPipeline } from "./proposed_api/cdk-pipeline";
-import { ConstructDomain } from './proposed_api/construct-domain';
+import { App, Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
+import { AppDeliveryPipeline, CdkBuilds } from "./app-delivery";
 
 export class MyPipelineStack extends Stack {
-  private pipeline: CdkPipeline;
+  private pipeline: AppDeliveryPipeline;
 
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, props);
-
-    process.env.BRANCH = 'huijbers/demo';
 
     // allow customizing the SecretsManager GitHub token name
     // (needed for the GitHub source action)
     const gitHubTokenSecretName = process.env.GITHUB_TOKEN || 'my-github-token';
 
-    this.pipeline = new CdkPipeline(this, 'Pipeline', {
+    this.pipeline = new AppDeliveryPipeline(this, 'Pipeline', {
       pipelineName: 'DemoPipeline',
 
       source: new codepipeline_actions.GitHubSourceAction({
@@ -30,7 +26,7 @@ export class MyPipelineStack extends Stack {
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
 
-      build: CdkBuilds.standardTypeScriptBuild({
+      build: CdkBuilds.standardNpmBuild({
         // Forward environment variables to build if configured, so
         // that synthesized pipeline will yield the same pipeline as has been
         // synth'd locally.
@@ -39,8 +35,7 @@ export class MyPipelineStack extends Stack {
     });
   }
 
-  public addStage(domain: ConstructDomain) {
-    domain.lock();
-    return this.pipeline.addCdkStage(domain.node.id, domain.stacks);
+  public addApplication(stageName: string, app: App) {
+    return this.pipeline.addApplicationStage(stageName, app);
   }
 }

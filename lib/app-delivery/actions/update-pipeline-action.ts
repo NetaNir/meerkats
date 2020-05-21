@@ -1,11 +1,11 @@
 import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
 import { Construct } from '@aws-cdk/core';
 
-export interface PublishAssetsActionProps {
+export interface UpdatePipelineActionProps {
   /**
    * The CodePipeline artifact that holds the Cloud Assembly.
    */
@@ -20,41 +20,56 @@ export interface PublishAssetsActionProps {
    * Dir in the zip with vendored NPM packages
    */
   readonly vendorZipDir: string;
+
+  /**
+   * Name of the pipeline stack
+   */
+  readonly pipelineStackName: string;
 }
 
-export class PublishAssetsAction extends Construct implements codepipeline.IAction {
+export class UpdatePipelineAction extends Construct implements codepipeline.IAction {
   private readonly action: codepipeline.IAction;
 
-  constructor(scope: Construct, id: string, private readonly props: PublishAssetsActionProps) {
+  constructor(scope: Construct, id: string, private readonly props: UpdatePipelineActionProps) {
     super(scope, id);
 
-    const project = new codebuild.PipelineProject(scope, 'Default', {
+    const selfMutationProject = new codebuild.PipelineProject(this, 'SelfMutation', {
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
           install: {
+            // commands: 'npm install -g aws-cdk',
             // tslint:disable-next-line:max-line-length
             commands: `(curl -o dl.zip -L "${this.props.vendoredGitHubLocation}" && unzip dl.zip && cd ${this.props.vendorZipDir} && npm install -g *.tgz)`,
           },
           build: {
-            commands: 'for manifest in *.assets.json; do cdk-assets --path $manifest --verbose publish; done',
+            commands: [
+              // Cloud Assembly is in *current* directory.
+              `cdk -a . deploy ${props.pipelineStackName} --require-approval=never --verbose`,
+            ],
           },
         },
       }),
-      environment: {
-        privileged: true, // needed to perform Docker builds
-      },
     });
 
-    project.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['sts:AssumeRole'],
-      resources: ['arn:*:iam::*:role/*-publishing-role-*'],
+    // allow the self-mutating project permissions to assume the bootstrap Action role
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["sts:AssumeRole"],
+      resources: ['arn:*:iam::*:role/*-deploy-action-role-*', 'arn:*:iam::*:role/*-publishing-role-*'],
     }));
-
-    this.action = new codepipeline_actions.CodeBuildAction({
-      actionName: 'Publish',
-      project,
-      input: this.props.cloudAssemblyInput,
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:DescribeStacks'],
+      resources: ['*'], // this is needed to check the status of the bootstrap stack when doing `cdk deploy`
+    }));
+    // S3 checks for the presence of the ListBucket permission
+    selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['s3:ListBucket'],
+      resources: ['*'],
+    }));
+    this.action = new cpactions.CodeBuildAction({
+      actionName: 'SelfMutate',
+      input: props.cloudAssemblyInput,
+      project: selfMutationProject,
     });
   }
 

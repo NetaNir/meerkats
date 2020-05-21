@@ -1,6 +1,5 @@
-import { CfnOutput, Construct, Environment } from '@aws-cdk/core';
+import { App, CfnOutput, Environment } from '@aws-cdk/core';
 import { AppStack } from './app-stack';
-import { ConstructDomain as Application } from './proposed_api/construct-domain';
 import { SharedStack } from './shared-stack';
 
 export interface MyApplicationProps {
@@ -10,14 +9,14 @@ export interface MyApplicationProps {
 /**
  * Deployable unit of my application
  */
-export class MyApplication extends Application {
+export class MyApplication extends App {
   /**
    * Output that holds the URL of the load balancer
    */
   public readonly urlOutput: CfnOutput;
 
-  constructor(scope: Construct, id: string, props: MyApplicationProps) {
-    super(scope, id);
+  constructor(props: MyApplicationProps) {
+    super();
 
     const sharedStack = new SharedStack(this, 'SharedStack', {
       env: props.env,
