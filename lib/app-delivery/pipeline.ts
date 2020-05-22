@@ -1,16 +1,13 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import * as assetSchema from '@aws-cdk/cdk-assets-schema';
 import { App, Construct, Stack } from '@aws-cdk/core';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as path from 'path';
 import { DeployCdkStackAction, PublishAssetsAction, UpdatePipelineAction } from './actions';
 import { ICdkBuild } from './builds';
 import { AssetManifest, DestinationIdentifier } from './private/asset-manifest';
+import { appOutDir } from './private/construct-tree';
 import { topologicalSort } from './private/toposort';
 import { AppDeliveryStage } from './stage';
-
-const VENDORED_GITHUB_LOCATION = `https://github.com/NetaNir/meerkats/archive/${process.env.BRANCH || 'master'}.zip`;
-const VENDOR_ZIP_DIR = `meerkats-${(process.env.BRANCH || 'master').replace(/\//g, '-')}/vendor`;
 
 export interface AppDeliveryPipelineProps {
   readonly source: codepipeline.IAction;
@@ -24,9 +21,15 @@ export class AppDeliveryPipeline extends Construct {
   private readonly cloudAssemblyArtifact: codepipeline.Artifact;
   private readonly pipeline: codepipeline.Pipeline;
   private readonly assets: AssetPublishing;
+  private readonly outDirsSeen = new Set<string>();
 
   constructor(scope: Construct, id: string, props: AppDeliveryPipelineProps) {
     super(scope, id);
+
+    if (!App.isApp(this.node.root)) {
+      throw new Error(`AppDeliveryPipeline must be created under an App`);
+    }
+
     const sourceOutput = props.source.actionProperties.outputs![0];
 
     const buildConfig = props.build.bind(this, {
@@ -55,15 +58,12 @@ export class AppDeliveryPipeline extends Construct {
           actions: [new UpdatePipelineAction(this, 'UpdatePipeline', {
             cloudAssemblyInput: this.cloudAssemblyArtifact,
             pipelineStackName: pipelineStack.stackName,
-            // hack hack for experimentation
-            vendoredGitHubLocation: VENDORED_GITHUB_LOCATION,
-            vendorZipDir: VENDOR_ZIP_DIR,
           })],
         },
       ],
     });
 
-    this.assets = new AssetPublishing(this, this.cloudAssemblyArtifact, this.pipeline.addStage({
+    this.assets = new AssetPublishing(this, 'Assets', this.cloudAssemblyArtifact, this.pipeline.addStage({
       stageName: 'Assets',
     }));
   }
@@ -75,6 +75,7 @@ export class AppDeliveryPipeline extends Construct {
    * all assets found in the application will be added to the asset publishing stage.
    */
   public addApplicationStage(stageName: string, application: App, options: AddApplicationStageOptions = {}): AppDeliveryStage {
+    this.validateAppOutDir(stageName, application);
     const asm = application.synth();
 
     // Get all assets manifests and add the assets in 'em to the asset publishing stage.
@@ -119,7 +120,7 @@ export class AppDeliveryPipeline extends Construct {
     const stackActions = this.stackActions;
     for (const stackAction of stackActions) {
       // For every dependency, it must be executed in an action before this one is prepared.
-      for (const dep of stackAction.artifact.dependencies) {
+      for (const dep of stackAction.artifact.dependencies.filter(isStackArtifact)) {
         const depAction = stackActions.find(s => s.artifact === dep);
 
         if (depAction === undefined) {
@@ -140,6 +141,18 @@ export class AppDeliveryPipeline extends Construct {
    */
   private get stackActions(): DeployCdkStackAction[] {
     return flatMap(this.pipeline.stages, s => s.actions.filter(isDeployAction));
+  }
+
+  private validateAppOutDir(stageName: string, application: App) {
+    const outDir = appOutDir(application);
+    const myAppOutDir = appOutDir(this.node.root as App);
+    if (!outDir.startsWith(myAppOutDir) || outDir === myAppOutDir) {
+      throw new Error(`The App of stage '${stageName}' must have an 'outdir' under '${myAppOutDir}'`);
+    }
+    if (this.outDirsSeen.has(outDir)) {
+      throw new Error(`All Apps given to 'addApplicationStage()' must have a distinct 'outdir' rooted under '${myAppOutDir}'`);
+    }
+    this.outDirsSeen.add(outDir);
   }
 }
 
@@ -169,12 +182,6 @@ export interface CdkStack {
   readonly outputsArtifact?: codepipeline.Artifact;
 }
 
-function topoSortStacks(stacks: Stack[]) {
-  return topologicalSort(stacks,
-    s => s.node.path,
-    s => s.dependencies.map(d => d.node.path));
-}
-
 function isAssetManifest(s: cxapi.CloudArtifact): s is cxapi.AssetManifestArtifact {
   return s instanceof cxapi.AssetManifestArtifact;
 }
@@ -182,13 +189,16 @@ function isAssetManifest(s: cxapi.CloudArtifact): s is cxapi.AssetManifestArtifa
 /**
  * Add appropriate publishing actions to the asset publishing stage
  */
-class AssetPublishing {
+class AssetPublishing extends Construct {
   private publishers: Record<string, PublishAssetsAction> = {};
+  private myCxAsmRoot: string;
 
-  constructor(
-    private readonly scope: Construct,
-    private readonly cloudAssemblyInput: codepipeline.Artifact,
-    private readonly stage: codepipeline.IStage) {
+  constructor(scope: Construct, id: string,
+              private readonly cloudAssemblyInput: codepipeline.Artifact,
+              private readonly stage: codepipeline.IStage) {
+    super(scope, id);
+
+    this.myCxAsmRoot = path.resolve(appOutDir(this.node.root as App));
   }
 
   /**
@@ -198,10 +208,10 @@ class AssetPublishing {
     const manifest = AssetManifest.fromFile(manifestArtifact.file);
 
     // FIXME: this is silly, we need the relative path here but no easy way to get it
-    const relativePath = path.relative(asm.directory, manifestArtifact.file);
+    const relativePath = path.relative(this.myCxAsmRoot, manifestArtifact.file);
 
     for (const entry of manifest.entries) {
-      this.publishAssetAction(relativePath, entry.id);
+      this.addPublishAssetAction(relativePath, entry.id);
     }
   }
 
@@ -212,14 +222,12 @@ class AssetPublishing {
    * are published in parallel. For each assets, all destinations are published sequentially
    * so that we can reuse expensive operations between them (mostly: building a Docker image).
    */
-  public publishAssetAction(relativeManifestPath: string, assetId: DestinationIdentifier) {
+  public addPublishAssetAction(relativeManifestPath: string, assetId: DestinationIdentifier) {
     let action = this.publishers[assetId.assetId];
     if (!action) {
-      action = this.publishers[assetId.assetId] = new PublishAssetsAction(this.scope, `Publish${assetId.assetId}`, {
+      action = this.publishers[assetId.assetId] = new PublishAssetsAction(this, assetId.assetId, {
         actionName: assetId.assetId,
         cloudAssemblyInput: this.cloudAssemblyInput,
-        vendoredGitHubLocation: VENDORED_GITHUB_LOCATION,
-        vendorZipDir: VENDOR_ZIP_DIR,
       });
       this.stage.addAction(action);
     }
@@ -235,4 +243,8 @@ export interface AddApplicationStageOptions {
    * @default - No outputs captured
    */
   captureStackOutputs?: string[];
+}
+
+function isStackArtifact(a: cxapi.CloudArtifact): a is cxapi.CloudFormationStackArtifact {
+  return a instanceof cxapi.CloudFormationStackArtifact;
 }

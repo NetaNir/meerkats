@@ -15,16 +15,6 @@ export interface PublishAssetsActionProps {
    * The CodePipeline artifact that holds the Cloud Assembly.
    */
   readonly cloudAssemblyInput: codepipeline.Artifact;
-
-  /**
-   * GitHub location where to retrieve ZIP with vendored NPM packages
-   */
-  readonly vendoredGitHubLocation: string;
-
-  /**
-   * Dir in the zip with vendored NPM packages
-   */
-  readonly vendorZipDir: string;
 }
 
 export class PublishAssetsAction extends Construct implements codepipeline.IAction {
@@ -34,13 +24,12 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
   constructor(scope: Construct, id: string, private readonly props: PublishAssetsActionProps) {
     super(scope, id);
 
-    const project = new codebuild.PipelineProject(scope, 'Default', {
+    const project = new codebuild.PipelineProject(this, 'Default', {
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
           install: {
-            // tslint:disable-next-line:max-line-length
-            commands: `(curl -o dl.zip -L "${this.props.vendoredGitHubLocation}" && unzip dl.zip && cd ${this.props.vendorZipDir} && npm install -g *.tgz)`,
+            commands: 'npm install -g cdk-assets',
           },
           build: {
             commands: Lazy.listValue({ produce: () => this.commands }),
@@ -66,6 +55,8 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
 
   /**
    * Add a single publishing command
+   *
+   * Manifest path should be relative to the root Cloud Assembly.
    */
   public addPublishCommand(relativeManifestPath: string, assetSelector: string) {
     const command = `cdk-assets --path "${relativeManifestPath}" --verbose publish "${assetSelector}"`;

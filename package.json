@@ -5,7 +5,7 @@
     "cicdk": "bin/cicdk.js"
   },
   "scripts": {
-    "build": "./vendor.sh out && tsc",
+    "build": "tsc",
     "watch": "tsc -w",
     "test": "/bin/true",
     "cdk": "cdk",
@@ -13,11 +13,11 @@
     "vendor-out": "./vendor.sh out"
   },
   "devDependencies": {
-    "@aws-cdk/assert": "^1.38.0",
+    "@aws-cdk/assert": "^1.41.0",
     "@types/aws-lambda": "^8.10.48",
     "@types/jest": "^24.0.22",
     "@types/node": "10.17.5",
-    "aws-cdk": "^1.38.0",
+    "aws-cdk": "^1.41.0",
     "jest": "^24.9.0",
     "ts-jest": "^24.1.0",
     "ts-node": "^8.1.0",
@@ -28,19 +28,19 @@
     "url": "https://github.com/NetaNir/meerkats.git"
   },
   "dependencies": {
-    "@aws-cdk/cdk-assets-schema": "^1.38.0",
-    "@aws-cdk/aws-apigateway": "^1.38.0",
-    "@aws-cdk/aws-codebuild": "^1.38.0",
-    "@aws-cdk/aws-codepipeline": "^1.38.0",
-    "@aws-cdk/aws-codepipeline-actions": "^1.38.0",
-    "@aws-cdk/aws-dynamodb": "^1.38.0",
-    "@aws-cdk/aws-ec2": "^1.38.0",
-    "@aws-cdk/aws-ecs": "^1.38.0",
-    "@aws-cdk/aws-elasticloadbalancingv2": "^1.38.0",
-    "@aws-cdk/aws-elasticloadbalancingv2-targets": "^1.38.0",
-    "@aws-cdk/aws-iam": "^1.38.0",
-    "@aws-cdk/aws-lambda": "^1.38.0",
-    "@aws-cdk/core": "^1.38.0",
+    "@aws-cdk/cdk-assets-schema": "^1.41.0",
+    "@aws-cdk/aws-apigateway": "^1.41.0",
+    "@aws-cdk/aws-codebuild": "^1.41.0",
+    "@aws-cdk/aws-codepipeline": "^1.41.0",
+    "@aws-cdk/aws-codepipeline-actions": "^1.41.0",
+    "@aws-cdk/aws-dynamodb": "^1.41.0",
+    "@aws-cdk/aws-ec2": "^1.41.0",
+    "@aws-cdk/aws-ecs": "^1.41.0",
+    "@aws-cdk/aws-elasticloadbalancingv2": "^1.41.0",
+    "@aws-cdk/aws-elasticloadbalancingv2-targets": "^1.41.0",
+    "@aws-cdk/aws-iam": "^1.41.0",
+    "@aws-cdk/aws-lambda": "^1.41.0",
+    "@aws-cdk/core": "^1.41.0",
     "source-map-support": "^0.5.16"
   },
   "vendorAdditional": ["cdk-assets", "aws-cdk"]

@@ -1,3 +1,6 @@
 {
-  "app": "node bin/cicdk.js"
+  "app": "node bin/main.js",
+  "context": {
+      "@aws-cdk/core:newStyleStackSynthesis": true
+  }
 }

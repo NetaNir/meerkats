@@ -20,8 +20,8 @@ export class WebServicePipelineStack extends Stack {
         actionName: 'GitHub',
         output: new codepipeline.Artifact(),
         oauthToken: SecretValue.secretsManager('github-token'),
-        owner: 'OWNER',
-        repo: 'REPO',
+        owner: 'NetaNir',
+        repo: 'meerkats',
       }),
 
       // How it will be built
@@ -31,7 +31,8 @@ export class WebServicePipelineStack extends Stack {
     // This is where we add copies of the application
     // ...
     const betaStage = pipeline.addApplicationStage('Beta', new WebServiceApp({
-      env: { account: 'ACCOUNT1', region: 'us-east-1' }
+      outdir: 'cdk.out/beta',
+      env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' }
     }));
 
     betaStage.addValidations(Validation.shellScript({
@@ -48,6 +49,11 @@ export class WebServicePipelineStack extends Stack {
         // Use 'curl' to GET the given URL and fail it it returns an error
         'curl -Ssf $ENDPOINT_URL',
       ],
+    }));
+
+    pipeline.addApplicationStage('Gamma', new WebServiceApp({
+      outdir: 'cdk.out/gamma',
+      env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-2' }
     }));
   }
 }

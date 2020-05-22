@@ -12,16 +12,6 @@ export interface UpdatePipelineActionProps {
   readonly cloudAssemblyInput: codepipeline.Artifact;
 
   /**
-   * GitHub location where to retrieve ZIP with vendored NPM packages
-   */
-  readonly vendoredGitHubLocation: string;
-
-  /**
-   * Dir in the zip with vendored NPM packages
-   */
-  readonly vendorZipDir: string;
-
-  /**
    * Name of the pipeline stack
    */
   readonly pipelineStackName: string;
@@ -38,9 +28,7 @@ export class UpdatePipelineAction extends Construct implements codepipeline.IAct
         version: '0.2',
         phases: {
           install: {
-            // commands: 'npm install -g aws-cdk',
-            // tslint:disable-next-line:max-line-length
-            commands: `(curl -o dl.zip -L "${this.props.vendoredGitHubLocation}" && unzip dl.zip && cd ${this.props.vendorZipDir} && npm install -g *.tgz)`,
+            commands: `npm install -g aws-cdk`,
           },
           build: {
             commands: [

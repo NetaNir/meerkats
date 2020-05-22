@@ -1,6 +1,7 @@
 import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import { App, Construct } from '@aws-cdk/core';
+import { appOutDir } from '../private/construct-tree';
 import { copyEnvironmentVariables } from './_util';
 import { CdkBuildConfig, CdkBuildOptions, ICdkBuild, StandardBuildOptions } from "./builds";
 
@@ -59,7 +60,7 @@ export class StandardNpmBuild implements ICdkBuild {
             },
             // save the generated files in the output artifact
             artifacts: {
-              'base-directory': 'cdk.out',
+              'base-directory': appOutDir(scope.node.root as App),
               "files": '**/*',
             },
           }),
