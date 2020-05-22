@@ -2,7 +2,8 @@ import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import * as cdk from '@aws-cdk/core';
-import { StandardNpmBuild } from './npm-build';
+import { StandardNpmBuild, StandardNpmBuildProps } from './npm-build';
+import { StandardYarnBuild, StandardYarnBuildProps } from './yarn-build';
 
 export interface CdkBuildOptions {
   readonly sourceOutput: codepipeline.Artifact;
@@ -35,8 +36,12 @@ export interface StandardBuildOptions {
 }
 
 export abstract class CdkBuilds {
-  public static standardNpmBuild(buildOptions: StandardBuildOptions = {}): ICdkBuild {
+  public static standardNpmBuild(buildOptions: StandardNpmBuildProps = {}): ICdkBuild {
     return new StandardNpmBuild(buildOptions);
+  }
+
+  public static standardYarnBuild(buildOptions: StandardYarnBuildProps = {}): ICdkBuild {
+    return new StandardYarnBuild(buildOptions);
   }
 
   public static standardJavaBuild(_cdkBuildOutput: codepipeline.Artifact): ICdkBuild {

@@ -1,7 +1,7 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
 import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
-import { AppDeliveryPipeline, CdkBuilds, ShellScriptValidation, Validation } from "./app-delivery";
+import { AppDeliveryPipeline, CdkBuilds, Validation } from "./app-delivery";
 import { WebServiceApp } from './web-service-app';
 
 /**
@@ -25,7 +25,7 @@ export class WebServicePipelineStack extends Stack {
       }),
 
       // How it will be built
-      build: CdkBuilds.standardNpmBuild(),
+      build: CdkBuilds.standardYarnBuild(),
     });
 
     // This is where we add copies of the application
