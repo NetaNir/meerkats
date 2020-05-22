@@ -23,7 +23,7 @@ export interface AppDeliveryStageProps {
 
 export class AppDeliveryStage extends Construct {
 
-  public _nextSequentialRunOrder = 0;
+  public _nextSequentialRunOrder = 1; // Must start at 1 eh
   private readonly pipelineStage: codepipeline.IStage;
   private readonly cloudAssemblyArtifact: codepipeline.Artifact;
   private readonly validations: IValidation[] = [];

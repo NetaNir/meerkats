@@ -22,6 +22,7 @@ export class WebServicePipelineStack extends Stack {
         oauthToken: SecretValue.secretsManager('github-token'),
         owner: 'NetaNir',
         repo: 'meerkats',
+        trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
 
       // How it will be built

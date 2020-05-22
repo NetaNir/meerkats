@@ -10,7 +10,7 @@ new WebServiceStack(app, 'WebService', {
 });
 
 new WebServicePipelineStack(app, 'PipelineStack', {
-  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-2' },
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' },
 });
 
 app.synth();
