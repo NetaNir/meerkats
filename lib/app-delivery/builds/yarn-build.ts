@@ -7,13 +7,6 @@ import { CdkBuildConfig, CdkBuildOptions, ICdkBuild, StandardBuildOptions } from
 
 export interface StandardYarnBuildProps extends StandardBuildOptions {
   /**
-   * Name of the build action
-   *
-   * @default 'Synth'
-   */
-  readonly actionName?: string;
-
-  /**
    * The install command
    *
    * @default 'yarn install --frozen-lockfile'
