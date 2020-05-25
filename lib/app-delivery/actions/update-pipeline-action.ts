@@ -43,7 +43,7 @@ export class UpdatePipelineAction extends Construct implements codepipeline.IAct
     // allow the self-mutating project permissions to assume the bootstrap Action role
     selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
       actions: ["sts:AssumeRole"],
-      resources: ['arn:*:iam::*:role/*-deploy-action-role-*', 'arn:*:iam::*:role/*-publishing-role-*'],
+      resources: ['arn:*:iam::*:role/*-deploy-role-*', 'arn:*:iam::*:role/*-publishing-role-*'],
     }));
     selfMutationProject.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cloudformation:DescribeStacks'],
