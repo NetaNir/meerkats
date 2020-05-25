@@ -3,8 +3,10 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
-import * as cdk from '@aws-cdk/core';
+import { App, Construct, Fn, Stack } from '@aws-cdk/core';
 import * as cxapi from '@aws-cdk/cx-api';
+import * as path from 'path';
+import { appOutDir } from '../private/construct-tree';
 
 /**
  * Properties for a DeployCdkStackAction
@@ -72,7 +74,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
 
-  constructor(scope: cdk.Construct, props: DeployCdkStackActionProps) {
+  constructor(scope: Construct, props: DeployCdkStackActionProps) {
     if (props.output && !props.outputFileName) {
       throw new Error(`If 'output' is set, 'outputFileName' is also required`);
     }
@@ -93,14 +95,20 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     this.stackName = props.stackName ?? props.artifact.stackName;
     const baseActionName = props.baseActionName ?? this.stackName;
     const changeSetName = props.changeSetName ?? 'PipelineChange';
-    const actionRegion = region === cdk.Stack.of(scope).region || region === cxapi.UNKNOWN_REGION ? undefined : region;
+    const actionRegion = region === Stack.of(scope).region || region === cxapi.UNKNOWN_REGION ? undefined : region;
+
+    // We need the path of the template relative to the root Cloud Assembly
+    // It should be easier to get this, but for now it is what it is.
+    const appAsmRoot = appOutDir(scope.node.root  as App);
+    const fullTemplatePath = path.join(props.artifact.assembly.directory, props.artifact.templateFile);
+    const relativePath = path.relative(appAsmRoot, fullTemplatePath);
 
     this.prepareChangeSetAction = new cpactions.CloudFormationCreateReplaceChangeSetAction({
       actionName: `${baseActionName}.Prepare`,
       changeSetName,
       runOrder: this.prepareRunOrder,
       stackName: this.stackName,
-      templatePath: props.cloudAssemblyInput.atPath(props.artifact.templateFile),
+      templatePath: props.cloudAssemblyInput.atPath(relativePath),
       adminPermissions: false,
       role: actionRole,
       deploymentRole: cloudFormationExecutionRole,
@@ -119,7 +127,7 @@ export class DeployCdkStackAction implements codepipeline.IAction {
     });
   }
 
-  public bind(scope: cdk.Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):
+  public bind(scope: Construct, stage: codepipeline.IStage, options: codepipeline.ActionBindOptions):
       codepipeline.ActionConfig {
     stage.addAction(this.prepareChangeSetAction);
 
@@ -135,9 +143,9 @@ export class DeployCdkStackAction implements codepipeline.IAction {
   }
 }
 
-function roleFromPlaceholderArn(scope: cdk.Construct, arn: string): iam.IRole;
-function roleFromPlaceholderArn(scope: cdk.Construct, arn: string | undefined): iam.IRole | undefined;
-function roleFromPlaceholderArn(scope: cdk.Construct, arn: string | undefined): iam.IRole | undefined {
+function roleFromPlaceholderArn(scope: Construct, arn: string): iam.IRole;
+function roleFromPlaceholderArn(scope: Construct, arn: string | undefined): iam.IRole | undefined;
+function roleFromPlaceholderArn(scope: Construct, arn: string | undefined): iam.IRole | undefined {
   if (!arn) { return undefined; }
 
   // Use placeholdered arn as construct ID.
@@ -160,7 +168,7 @@ function cfnExpressionFromManifestString(s: string) {
   // This implementation relies on the fact that the manifest placeholders are
   // '${AWS::Partition}' etc., and so are the same values as those that are
   // trivially substituable using a `Fn.sub`.
-  return cdk.Fn.sub(s);
+  return Fn.sub(s);
 }
 
 /**
