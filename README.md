@@ -64,3 +64,13 @@ Wuuuut!
       the referenced GitHub repository, which by that point might not have the
       same source in it that you just deployed, so the pipeline might overwrite
       itself with something else!
+
+
+## FAQ
+
+```
+CREATE_FAILED        | AWS::KMS::Key               | Pipeline/Pipeline/ArtifactsBucketEncryptionKey (PipelineArtifactsBucketEncryptionKeyF5BF0670) Policy contains a statement with one or more invalid principals. (Service: AWSKMS; Status Code: 400; Error Code: MalformedPolicyDocumentException; Request ID: 20827aab-3e89-41d4-ba7f-b87115a55e36)
+```
+
+You need to bootstrap the target account+environment pair.
+
