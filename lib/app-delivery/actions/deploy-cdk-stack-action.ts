@@ -3,7 +3,7 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
-import { App, Construct, Fn, Stack } from '@aws-cdk/core';
+import { App, Arn, Construct, Fn, Stack } from '@aws-cdk/core';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as path from 'path';
 import { appOutDir } from '../private/construct-tree';
@@ -176,7 +176,7 @@ function roleFromPlaceholderArn(scope: Construct, arn: string | undefined): iam.
  * away. It will never be synthesized, but all the logic happens to work out!
  */
 function hackyRoleScope(scope: Construct, arn: string): Construct {
-  const parts = Arn.parse(EnvironmentPlaceholders.replace(arn, {
+  const parts = Arn.parse(cxapi.EnvironmentPlaceholders.replace(arn, {
     accountId: '', // Empty string on purpose, see below
     partition: '',
     region: '',
