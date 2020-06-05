@@ -151,6 +151,8 @@ function roleFromPlaceholderArn(scope: Construct, arn: string | undefined): iam.
   // Use placeholdered arn as construct ID.
   const id = arn;
 
+  scope = hackyRoleScope(scope, arn);
+
   // https://github.com/aws/aws-cdk/issues/7255
   let existingRole = scope.node.tryFindChild(`ImmutableRole${id}`) as iam.IRole;
   if (existingRole) { return existingRole; }
@@ -159,6 +161,33 @@ function roleFromPlaceholderArn(scope: Construct, arn: string | undefined): iam.
   if (existingRole) { return existingRole; }
 
   return iam.Role.fromRoleArn(scope, id, cfnExpressionFromManifestString(arn), { mutable: false });
+}
+
+/**
+ * MASSIVE HACK
+ *
+ * We have a bug in the CDK where it's only going to consider Roles that are physically in a
+ * different Stack object from the Pipeline "cross-account", and will add the appropriate
+ * Bucket/Key policies.
+ * https://github.com/aws/aws-cdk/pull/8280 will resolve this, but for now we fake it by hacking
+ * up a Stack object to root the role in!
+ *
+ * Fortunatey, we can just 'new up' an unrooted Stack (unit tests do this all the time) and toss it
+ * away. It will never be synthesized, but all the logic happens to work out!
+ */
+function hackyRoleScope(scope: Construct, arn: string): Construct {
+  const parts = Arn.parse(EnvironmentPlaceholders.replace(arn, {
+    accountId: '', // Empty string on purpose, see below
+    partition: '',
+    region: '',
+  }));
+  return new Stack(undefined, undefined, {
+    env: {
+      // Empty string means ARN had a placeholder which means same account as pipeline stack
+      account: parts.account || Stack.of(scope).account,
+      // 'region' from an IAM ARN is always an empty string, so no point.
+    }
+  });
 }
 
 /**
