@@ -7,7 +7,9 @@ import * as path from 'path';
  * A stack for our simple Lambda-powered web service
  */
 export class WebServiceStack extends Stack {
-  constructor(scope: Construct, id: string, props: StackProps) {
+  public readonly urlOutput: CfnOutput;
+
+  constructor(scope: Construct, id: string, props: StackProps = {}) {
     super(scope, id, props);
 
     // The Lambda function that contains the functionality
@@ -24,7 +26,7 @@ export class WebServiceStack extends Stack {
     });
 
     // An output with a well-known name to read it from the integ tests
-    new CfnOutput(this, 'Url', {
+    this.urlOutput = new CfnOutput(this, 'Url', {
       value: gw.url,
     });
   }

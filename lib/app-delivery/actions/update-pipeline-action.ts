@@ -4,6 +4,7 @@ import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
 import { Construct } from '@aws-cdk/core';
+import { embeddedAsmPath } from '../private/construct-internals';
 
 export interface UpdatePipelineActionProps {
   /**
@@ -15,6 +16,20 @@ export interface UpdatePipelineActionProps {
    * Name of the pipeline stack
    */
   readonly pipelineStackName: string;
+
+  /**
+   * Version of CDK CLI to 'npm install'.
+   *
+   * @default - Latest version
+   */
+  readonly cdkCliVersion?: string;
+
+  /**
+   * Name of the CodeBuild project
+   *
+   * @default - Automatically generated
+   */
+  readonly projectName?: string;
 }
 
 export class UpdatePipelineAction extends Construct implements codepipeline.IAction {
@@ -23,17 +38,20 @@ export class UpdatePipelineAction extends Construct implements codepipeline.IAct
   constructor(scope: Construct, id: string, private readonly props: UpdatePipelineActionProps) {
     super(scope, id);
 
+    const installSuffix = props.cdkCliVersion ? `@${props.cdkCliVersion}` : '';
+
     const selfMutationProject = new codebuild.PipelineProject(this, 'SelfMutation', {
+      projectName: props.projectName,
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
           install: {
-            commands: `npm install -g aws-cdk`,
+            commands: `npm install -g aws-cdk${installSuffix}`,
           },
           build: {
             commands: [
               // Cloud Assembly is in *current* directory.
-              `cdk -a . deploy ${props.pipelineStackName} --require-approval=never --verbose`,
+              `cdk -a ${embeddedAsmPath(scope)} deploy ${props.pipelineStackName} --require-approval=never --verbose`,
             ],
           },
         },

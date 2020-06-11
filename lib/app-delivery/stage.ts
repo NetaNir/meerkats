@@ -1,7 +1,11 @@
+import { CloudFormationCapabilities } from '@aws-cdk/aws-cloudformation';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
-import { CfnOutput, Construct, Stack } from "@aws-cdk/core";
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import { Construct, Stack, Stage } from "@aws-cdk/core";
 import * as cxapi from '@aws-cdk/cx-api';
-import { DeployCdkStackAction } from './actions';
+import { AssetType, DeployCdkStackAction } from './actions';
+import { AssetManifest, DestinationIdentifier, DockerImageManifestEntry, FileManifestEntry } from './private/asset-manifest';
+import { topologicalSort } from './private/toposort';
 import { IValidation } from './validation';
 
 export interface AppDeliveryStageProps {
@@ -11,65 +15,114 @@ export interface AppDeliveryStageProps {
   readonly stageName: string;
 
   /**
-   * Pipeline to add the stage to
+   * The underlying Pipeline Stage associated with thisAppDeliveryStage
    */
-  readonly pipeline: codepipeline.Pipeline;
+  readonly pipelineStage: codepipeline.IStage;
 
   /**
    * The CodePipeline Artifact with the Cloud Assembly
    */
   readonly cloudAssemblyArtifact: codepipeline.Artifact;
+
+  /**
+   * Features the Stage needs from its environment
+   */
+  readonly host: IStageHost;
 }
 
 export class AppDeliveryStage extends Construct {
 
   public _nextSequentialRunOrder = 1; // Must start at 1 eh
+  private _manualApprovalCounter = 1;
   private readonly pipelineStage: codepipeline.IStage;
   private readonly cloudAssemblyArtifact: codepipeline.Artifact;
   private readonly validations: IValidation[] = [];
-  private readonly stacksToDeploy = new Array <{ runOrder: number, stackArtifact: cxapi.CloudFormationStackArtifact }>();
-  private readonly outputArtifacts: Record<string, codepipeline.Artifact> = {};
+  private readonly stacksToDeploy = new Array<DeployStackCommand>();
   private readonly stageName: string;
+  private readonly host: IStageHost;
 
   constructor(scope: Construct, id: string, props: AppDeliveryStageProps) {
     super(scope, id);
 
     this.stageName = props.stageName;
-
-    this.pipelineStage = props.pipeline.addStage({
-      stageName: props.stageName,
-    });
+    this.pipelineStage = props.pipelineStage;
     this.cloudAssemblyArtifact = props.cloudAssemblyArtifact;
+    this.host = props.host;
   }
 
+  public addApplicationStage(appStage: Stage, options: AddStageOptions = {}) {
+    const asm = appStage.synth();
+
+    const sortedTranches = topologicalSort(asm.stacks,
+      stack => stack.id,
+      stack => stack.dependencies.map(d => d.id));
+
+    for (const stacks of sortedTranches) {
+      const runOrder = this.nextSequentialRunOrder(2); // We need 2 actions
+      let executeRunOrder = runOrder + 1;
+
+      // If we need to insert a manual approval action, then what's the executeRunOrder
+      // now is where we add a manual approval step, and we allocate 1 more runOrder
+      // for the execute.
+      if (options.manualApprovals) {
+        this.addManualApprovalAction({ runOrder: executeRunOrder });
+        executeRunOrder = this.nextSequentialRunOrder();
+      }
+
+      // These don't have a dependency on each other, so can all be added in parallel
+      for (const stack of stacks) {
+        this.addStackArtifactDeployment(stack, { runOrder, executeRunOrder });
+      }
+    }
+
+    this.addValidations(...options.validations ?? []);
+  }
+
+  /**
+   * Add the given validations at the end of the current stage
+   */
   public addValidations(...validations: IValidation[]) {
     this.validations.push(...validations);
   }
 
   /**
-   * Return the artifact that holds the outputs for the given stack
+   * Add a deployment action based on a stack artifact
    */
-  public stackOutputs(stackName: string): StackOutputs {
-    if (!this.stacksToDeploy.find(s => s.stackArtifact.stackName)) {
-      throw new Error(`No stack with name '${stackName}' added to stage '${this.stageName}' yet. Add the stack first before calling stackOutputs().`);
-    }
+  public addStackArtifactDeployment(stackArtifact: cxapi.CloudFormationStackArtifact, options: AddStackOptions = {}) {
+    // Get all assets manifests and add the assets in 'em to the asset publishing stage.
+    this.publishAssetDependencies(stackArtifact);
 
-    if (!this.outputArtifacts[stackName]) {
-      this.outputArtifacts[stackName] = new codepipeline.Artifact(`Artifact_${this.stageName}_${stackName}_Outputs`);
-    }
-    return new StackOutputs(this.outputArtifacts[stackName].atPath('outputs.json'));
+    // Remember for later, see 'prepare()'
+    // We know that deploying a stack is going to take up 2 runorder slots later on.
+    const runOrder = options.runOrder ?? this.nextSequentialRunOrder(2);
+    const executeRunOrder = options.executeRunOrder ?? runOrder + 1;
+    this.stacksToDeploy.push({
+      prepareRunOrder: runOrder,
+      executeRunOrder,
+      stackArtifact
+    });
+
+    this.advanceRunOrderPast(runOrder);
+    this.advanceRunOrderPast(executeRunOrder);
   }
 
   /**
-   * Add a deployment action based on a stack artifact
+   * Add a manual approval action
+   *
+   * If you need more flexibility than what this method offers,
+   * use `addCustomAction` with a `ManualApprovalAction`.
    */
-  public addStackDeploymentAction(stackArtifact: cxapi.CloudFormationStackArtifact) {
-    // Remember for later, see 'prepare()'
-    // We know that deploying a stack is going to take up 2 runorder slots later on.
-    this.stacksToDeploy.push({
-      runOrder: this.nextSequentialRunOrder(2),
-      stackArtifact
-    });
+  public addManualApprovalAction(options: AddManualApprovalOptions = {}) {
+    let actionName = options.actionName;
+    if (!actionName) {
+      actionName = `ManualApproval${this._manualApprovalCounter > 1 ? this._manualApprovalCounter : ''}`;
+      this._manualApprovalCounter += 1;
+    }
+
+    this.addCustomAction(new cpactions.ManualApprovalAction({
+      actionName,
+      runOrder: options.runOrder ?? this.nextSequentialRunOrder(),
+    }));
   }
 
   /**
@@ -96,6 +149,13 @@ export class AppDeliveryStage extends Construct {
   }
 
   /**
+   * Whether this Stage contains an action to deploy the given stack, identified by its artifact ID
+   */
+  public deploysStack(artifactId: string) {
+    return this.stacksToDeploy.map(s => s.stackArtifact.id).includes(artifactId);
+  }
+
+  /**
    * Actually add all the DeployStack actions to the stage.
    *
    * We do this late because before we can render the actual DeployActions,
@@ -106,15 +166,15 @@ export class AppDeliveryStage extends Construct {
    * is a limitation that we should take away in the base library.
    */
   protected prepare() {
-    for (const { runOrder, stackArtifact } of this.stacksToDeploy) {
-      const artifact = this.outputArtifacts[stackArtifact.stackName];
+    for (const { prepareRunOrder: runOrder, stackArtifact } of this.stacksToDeploy) {
+      const artifact = this.host.stackOutputArtifact(stackArtifact.id);
 
-      this.pipelineStage.addAction(new DeployCdkStackAction(this, {
-        artifact: stackArtifact,
+      this.pipelineStage.addAction(DeployCdkStackAction.fromStackArtifact(this, stackArtifact, {
+        baseActionName: this.simplifyStackName(stackArtifact.stackName),
         cloudAssemblyInput: this.cloudAssemblyArtifact,
         output: artifact,
         outputFileName: artifact ? 'outputs.json' : undefined,
-        baseRunOrder: runOrder,
+        prepareRunOrder: runOrder,
       }));
     }
 
@@ -122,23 +182,197 @@ export class AppDeliveryStage extends Construct {
       validation.bind(this, this);
     }
   }
-}
 
-export class StackOutputs {
-  constructor(public readonly artifactFile: codepipeline.ArtifactPath) {
+  /**
+   * Advance the runorder counter so that the next sequential number is higher than the given one
+   */
+  private advanceRunOrderPast(lastUsed: number) {
+    this._nextSequentialRunOrder = Math.max(lastUsed + 1, this._nextSequentialRunOrder);
   }
 
-  public output(outputName: string) {
-    return new StackOutput(this, outputName);
+  /**
+   * Simplify the stack name by removing the `Stage-` prefix if it exists.
+   */
+  private simplifyStackName(s: string) {
+    return stripPrefix(s, `${this.stageName}-`);
+  }
+
+  /**
+   * Make sure all assets depended on by this stack are published in this pipeline
+   *
+   * Taking care to exclude the stack template itself -- it is being published
+   * as an asset because the CLI needs to know the asset publishing role when
+   * pushing the template to S3, but in the case of CodePipeline we always
+   * reference the template from the artifact bucket.
+   *
+   * (NOTE: this is only true for top-level stacks, not nested stacks. Nested
+   * Stack templates are always published as assets).
+   */
+  private publishAssetDependencies(stackArtifact: cxapi.CloudFormationStackArtifact) {
+    const assetManifests = stackArtifact.dependencies.filter(isAssetManifest);
+
+    for (const manifestArtifact of assetManifests) {
+      const manifest = AssetManifest.fromFile(manifestArtifact.file);
+
+      for (const entry of manifest.entries) {
+        let assetType: AssetType;
+        if (entry instanceof DockerImageManifestEntry) {
+          assetType = AssetType.DOCKER_IMAGE;
+        } else if (entry instanceof FileManifestEntry) {
+          // Don't publishg the template for this stack
+          if (entry.source.packaging === 'file' && entry.source.path === stackArtifact.templateFile) {
+            continue;
+          }
+
+          assetType = AssetType.FILE;
+        } else {
+          throw new Error(`Unrecognized asset type: ${entry.type}`);
+        }
+
+        this.host.publishAsset({
+          assetManifestPath: manifestArtifact.file,
+          assetId: entry.id.assetId,
+          assetSelector: entry.id.toString(),
+          assetType,
+        });
+      }
+    }
   }
 }
 
+/**
+ * Additional options for adding a stack deployment
+ */
+export interface AddStackOptions {
+  /**
+   * Base runorder
+   *
+   * @default - Next sequential runorder
+   */
+  runOrder?: number;
+
+  /**
+   * Base runorder
+   *
+   * @default - runOrder + 1
+   */
+  executeRunOrder?: number;
+}
+
+/**
+ * A single output of a Stack
+ */
 export class StackOutput {
-  public static fromCfnOutput(stage: AppDeliveryStage, output: CfnOutput) {
-    const stack = Stack.of(output);
-    return stage.stackOutputs(stack.stackName).output(output.logicalId);
-  }
+  /**
+   * The artifact and file the output is stored in
+   */
+  public readonly artifactFile: codepipeline.ArtifactPath;
 
-  constructor(public readonly outputs: StackOutputs, public readonly outputName: string) {
+  /**
+   * The name of the output in the JSON object in the file
+   */
+  public readonly outputName: string;
+
+  /**
+   * Build a StackOutput from a known artifact and an output name
+   */
+  constructor(artifactFile: codepipeline.ArtifactPath, outputName: string) {
+    this.artifactFile = artifactFile;
+    this.outputName = outputName;
   }
+}
+
+function stripPrefix(s: string, prefix: string) {
+  return s.startsWith(prefix) ? s.substr(prefix.length) : s;
+}
+
+function isAssetManifest(s: cxapi.CloudArtifact): s is cxapi.AssetManifestArtifact {
+  return s instanceof cxapi.AssetManifestArtifact;
+}
+
+/**
+ * Features that the Stage needs from its environment
+ */
+export interface IStageHost {
+  /**
+   * Make sure all the assets from the given manifest are published
+   */
+  publishAsset(command: AssetPublishingCommand): void;
+
+  /**
+   * Return the Artifact the given stack has to emit its outputs into, if any
+   */
+  stackOutputArtifact(stackArtifactId: string): codepipeline.Artifact | undefined;
+}
+
+/**
+ * Instructions to publish certain assets
+ */
+export interface AssetPublishingCommand {
+  /**
+   * Asset manifest path
+   */
+  readonly assetManifestPath: string;
+
+  /**
+   * Asset identifier
+   */
+  readonly assetId: string;
+
+  /**
+   * Asset selector to pass to `cdk-assets`.
+   */
+  readonly assetSelector: string;
+
+  /**
+   * Type of asset to publish
+   */
+  readonly assetType: AssetType;
+}
+
+export interface AddStageOptions {
+  /**
+   * Validations to add to the stage
+   *
+   * @default - No validations
+   */
+  readonly validations?: IValidation[];
+
+  /**
+   * Add manual approvals before executing change sets
+   *
+   * This gives humans the opportunity to confirm the change set looks alright
+   * before deploying it.
+   *
+   * @default false
+   */
+  readonly manualApprovals?: boolean;
+}
+
+/**
+ * Options for addManualApproval
+ */
+export interface AddManualApprovalOptions {
+  /**
+   * The name of the manual approval action
+   *
+   * @default 'ManualApproval' with a rolling counter
+   */
+  readonly actionName?: string;
+
+  /**
+   * The runOrder for this action
+   *
+   * @default - The next sequential runOrder
+   */
+  readonly runOrder?: number;
+}
+
+/**
+ * Queued "deploy stack" command that is reified during prepare()
+ */
+interface DeployStackCommand {
+  prepareRunOrder: number;
+  executeRunOrder: number;
+  stackArtifact: cxapi.CloudFormationStackArtifact;
 }

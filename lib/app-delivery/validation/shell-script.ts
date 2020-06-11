@@ -9,6 +9,13 @@ export interface ShellScriptValidationProps {
   readonly name: string;
   readonly useOutputs?: Record<string, StackOutput>;
   readonly commands: string[];
+
+  /**
+   * Bash options to set at the start of the script
+   *
+   * @default '-eu' (errexit and nounset)
+   */
+  readonly bashOptions?: string;
 }
 
 export class ShellScriptValidation implements IValidation {
@@ -19,9 +26,13 @@ export class ShellScriptValidation implements IValidation {
     const inputs = new Array<codepipeline.Artifact>();
 
     const envVarCommands = new Array<string>();
-    envVarCommands.push('set -e');
+
+    const bashOptions = this.props.bashOptions ?? '-eu';
+    if (bashOptions) {
+      envVarCommands.push(`set ${bashOptions}`);
+    }
     for (const [varName, output] of Object.entries(this.props.useOutputs ?? {})) {
-      const outputArtifact = output.outputs.artifactFile;
+      const outputArtifact = output.artifactFile;
 
       // Add the artifact to the list of inputs, if it's not in there already. Determine
       // the location where CodeBuild is going to stick it based on whether it's the first (primary)

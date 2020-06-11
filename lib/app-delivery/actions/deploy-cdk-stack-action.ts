@@ -3,20 +3,15 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
 import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
-import { App, Arn, Construct, Fn, Stack } from '@aws-cdk/core';
+import { Arn, Construct, Fn, Stack } from '@aws-cdk/core';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as path from 'path';
-import { appOutDir } from '../private/construct-tree';
+import { appOf, assemblyBuilderOf } from '../private/construct-internals';
 
 /**
- * Properties for a DeployCdkStackAction
+ * Customization options for a DeployCdkStackAction
  */
-export interface DeployCdkStackActionProps {
-  /**
-   * The Stack to deploy, by means of its stack artifact
-   */
-  readonly artifact: cxapi.CloudFormationStackArtifact;
-
+export interface DeployCdkStackActionOptions {
   /**
    * Base name of the action
    *
@@ -30,11 +25,18 @@ export interface DeployCdkStackActionProps {
   readonly cloudAssemblyInput: codepipeline.Artifact;
 
   /**
-   * Run order for the 2 actions that will be created
+   * Run order for the Prepare action
    *
    * @default 1
    */
-  readonly baseRunOrder?: number;
+  readonly prepareRunOrder?: number;
+
+  /**
+   * Run order for the Execute action
+   *
+   * @default - prepareRunOrder + 1
+   */
+  readonly executeRunOrder?: number;
 
   /**
    * Artifact to write Stack Outputs to
@@ -56,7 +58,66 @@ export interface DeployCdkStackActionProps {
    * @default 'PipelineChange'
    */
   readonly changeSetName?: string;
+}
 
+/**
+ * Properties for a DeployCdkStackAction
+ */
+export interface DeployCdkStackActionProps extends DeployCdkStackActionOptions {
+  /**
+   * Relative path of template in the input artifact
+   */
+  readonly templatePath: string;
+
+  /**
+   * Role for the action to assume
+   *
+   * This controls the account to deploy into
+   */
+  readonly actionRole: iam.IRole;
+
+  /**
+   * The name of the stack that should be created/updated
+   */
+  readonly stackName: string;
+
+  /**
+   * Role to execute CloudFormation under
+   *
+   * @default - Execute CloudFormation using the action role
+   */
+  readonly cloudFormationExecutionRole?: iam.IRole;
+
+  /**
+   * Region to deploy into
+   *
+   * @default - Same region as pipeline
+   */
+  readonly region?: string;
+
+  /**
+   * Artifact ID for the stack deployed here
+   *
+   * Used for pipeline order checking.
+   *
+   * @default - Order will not be checked
+   */
+  readonly stackArtifactId?: string;
+
+  /**
+   * Artifact ID for the stacks this stack depends on
+   *
+   * Used for pipeline order checking.
+   *
+   * @default - No dependencies
+   */
+  readonly dependencyStackArtifactIds?: string[];
+}
+
+/**
+ * Options for the 'fromStackArtifact' operation
+ */
+export interface CdkStackActionFromArtifactOptions extends DeployCdkStackActionOptions {
   /**
    * The name of the stack that should be created/updated
    *
@@ -65,54 +126,79 @@ export interface DeployCdkStackActionProps {
   readonly stackName?: string;
 }
 
+/**
+ * Action to deploy a CDK Stack
+ *
+ * Adds two CodePipeline Actions to the pipeline: one to create a ChangeSet
+ * and one to execute it.
+ */
 export class DeployCdkStackAction implements codepipeline.IAction {
+  /**
+   * Construct a DeployCdkStackAction from a Stack artifact
+   */
+  public static fromStackArtifact(scope: Construct, artifact: cxapi.CloudFormationStackArtifact, options: CdkStackActionFromArtifactOptions) {
+    if (!artifact.assumeRoleArn) {
+      // tslint:disable-next-line:max-line-length
+      throw new Error(`Stack '${artifact.stackName}' does not have deployment role information; use the 'DefaultStackSynthesizer' synthesizer, or set the '@aws-cdk/core:newStyleStackSynthesis' context key.`);
+    }
+
+    const actionRole = roleFromPlaceholderArn(scope, artifact.assumeRoleArn);
+    const cloudFormationExecutionRole = roleFromPlaceholderArn(scope, artifact.cloudFormationExecutionRoleArn);
+
+    const artRegion = artifact.environment.region;
+    const region = artRegion === Stack.of(scope).region || artRegion === cxapi.UNKNOWN_REGION ? undefined : artRegion;
+
+    // We need the path of the template relative to the root Cloud Assembly
+    // It should be easier to get this, but for now it is what it is.
+    const appAsmRoot = assemblyBuilderOf(appOf(scope)).outdir;
+    const fullTemplatePath = path.join(artifact.assembly.directory, artifact.templateFile);
+    const templatePath = path.relative(appAsmRoot, fullTemplatePath);
+
+    return new DeployCdkStackAction({
+      actionRole,
+      cloudFormationExecutionRole,
+      templatePath,
+      region,
+      stackArtifactId: artifact.id,
+      dependencyStackArtifactIds: artifact.dependencies.filter(isStackArtifact).map(s => s.id),
+      stackName: options.stackName ?? artifact.stackName,
+      ...options,
+    });
+  }
+
   public readonly prepareRunOrder: number;
   public readonly executeRunOrder: number;
-  public readonly artifact: cxapi.CloudFormationStackArtifact;
   public readonly stackName: string;
+  public readonly stackArtifactId?: string;
+  public readonly dependencyStackArtifactIds: string[];
 
   private readonly prepareChangeSetAction: cpactions.CloudFormationCreateReplaceChangeSetAction;
   private readonly executeChangeSetAction: cpactions.CloudFormationExecuteChangeSetAction;
 
-  constructor(scope: Construct, props: DeployCdkStackActionProps) {
+  constructor(props: DeployCdkStackActionProps) {
     if (props.output && !props.outputFileName) {
       throw new Error(`If 'output' is set, 'outputFileName' is also required`);
     }
 
-    if (!props.artifact.assumeRoleArn) {
-      // tslint:disable-next-line:max-line-length
-      throw new Error(`Stack '${props.artifact.stackName}' does not have deployment role information; use the 'DefaultStackSynthesizer' synthesizer, or set the '@aws-cdk/core:newStyleStackSynthesis' context key.`);
-    }
+    this.stackArtifactId = props.stackArtifactId;
+    this.dependencyStackArtifactIds = props.dependencyStackArtifactIds ?? [];
 
-    this.artifact = props.artifact;
-
-    const actionRole = roleFromPlaceholderArn(scope, props.artifact.assumeRoleArn);
-    const cloudFormationExecutionRole = roleFromPlaceholderArn(scope, props.artifact.cloudFormationExecutionRoleArn);
-    const region = props.artifact.environment.region;
-
-    this.prepareRunOrder = props.baseRunOrder ?? 1;
-    this.executeRunOrder = this.prepareRunOrder + 1;
-    this.stackName = props.stackName ?? props.artifact.stackName;
+    this.prepareRunOrder = props.prepareRunOrder ?? 1;
+    this.executeRunOrder = props.executeRunOrder ?? this.prepareRunOrder + 1;
+    this.stackName = props.stackName;
     const baseActionName = props.baseActionName ?? this.stackName;
     const changeSetName = props.changeSetName ?? 'PipelineChange';
-    const actionRegion = region === Stack.of(scope).region || region === cxapi.UNKNOWN_REGION ? undefined : region;
-
-    // We need the path of the template relative to the root Cloud Assembly
-    // It should be easier to get this, but for now it is what it is.
-    const appAsmRoot = appOutDir(scope.node.root  as App);
-    const fullTemplatePath = path.join(props.artifact.assembly.directory, props.artifact.templateFile);
-    const relativePath = path.relative(appAsmRoot, fullTemplatePath);
 
     this.prepareChangeSetAction = new cpactions.CloudFormationCreateReplaceChangeSetAction({
       actionName: `${baseActionName}.Prepare`,
       changeSetName,
       runOrder: this.prepareRunOrder,
       stackName: this.stackName,
-      templatePath: props.cloudAssemblyInput.atPath(relativePath),
+      templatePath: props.cloudAssemblyInput.atPath(props.templatePath),
       adminPermissions: false,
-      role: actionRole,
-      deploymentRole: cloudFormationExecutionRole,
-      region: actionRegion,
+      role: props.actionRole,
+      deploymentRole: props.cloudFormationExecutionRole,
+      region: props.region,
       capabilities: [cfn.CloudFormationCapabilities.NAMED_IAM, cfn.CloudFormationCapabilities.AUTO_EXPAND],
     });
     this.executeChangeSetAction = new cpactions.CloudFormationExecuteChangeSetAction({
@@ -120,8 +206,8 @@ export class DeployCdkStackAction implements codepipeline.IAction {
       changeSetName,
       runOrder: this.executeRunOrder,
       stackName: this.stackName,
-      role: actionRole,
-      region: actionRegion,
+      role: props.actionRole,
+      region: props.region,
       outputFileName: props.outputFileName,
       output: props.output,
     });
@@ -214,7 +300,14 @@ export interface FromStackArtifactOptions {
    *
    * @default 1
    */
-  readonly baseRunOrder?: number;
+  readonly prepareRunOrder?: number;
+
+  /**
+   * Run order for the Execute action
+   *
+   * @default - prepareRunOrder + 1
+   */
+  readonly executeRunOrder?: number;
 
   /**
    * Artifact to write Stack Outputs to
@@ -229,4 +322,8 @@ export interface FromStackArtifactOptions {
    * @default - Required when 'output' is set
    */
   readonly outputFileName?: string;
+}
+
+function isStackArtifact(a: cxapi.CloudArtifact): a is cxapi.CloudFormationStackArtifact {
+  return a instanceof cxapi.CloudFormationStackArtifact;
 }

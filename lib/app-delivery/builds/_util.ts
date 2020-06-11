@@ -9,3 +9,7 @@ export function copyEnvironmentVariables(...names: string[]): Record<string, cod
   }
   return ret;
 }
+
+export function filterEmpty(xs: Array<string | undefined>): string[] {
+  return xs.filter(x => x) as any;
+}

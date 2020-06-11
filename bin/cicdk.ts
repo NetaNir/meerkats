@@ -6,7 +6,7 @@ import { MyPipelineStack } from '../lib/my-pipeline-stack';
 
 const app = new App();
 
-new MyApplication({
+new MyApplication(app, 'Dev', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
 });
 
@@ -14,11 +14,11 @@ const pipeline = new MyPipelineStack(app, 'PipelineStack', {
   env: { account: '355421412380', region: 'eu-west-1' },
 });
 
-pipeline.addApplication('Beta', new MyApplication({
+pipeline.addApplicationStage(new MyApplication(app, 'Beta', {
   env: { account: '355421412380', region: 'eu-west-1' },
 }));
 
-pipeline.addApplication('Gamma', new MyApplication({
+pipeline.addApplicationStage(new MyApplication(app, 'Gamma', {
   env: { account: '561462023695', region: 'us-east-2' },
 }));
 

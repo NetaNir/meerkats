@@ -1,7 +1,7 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
-import { AppDeliveryPipeline, CdkBuilds, Validation } from "./app-delivery";
+import { Construct, SecretValue, Stack, StackProps, Stage } from '@aws-cdk/core';
+import { AppDeliveryPipeline, CdkBuilds, StackOutput, Validation } from "./app-delivery";
 import { WebServiceApp } from './web-service-app';
 
 /**
@@ -31,29 +31,25 @@ export class WebServicePipelineStack extends Stack {
 
     // This is where we add copies of the application
     // ...
-    const betaStage = pipeline.addApplicationStage('Beta', new WebServiceApp({
-      outdir: 'cdk.out/beta',
+    const betaApp = new WebServiceApp(this, 'Beta', {
       env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' }
-    }));
+    });
 
-    betaStage.addValidations(Validation.shellScript({
-      name: 'TestEndpoint',
-      useOutputs: {
-        // From the stack 'WebService', get the output 'Url' and make it available in
-        // the shell script as '$ENDPOINT_URL'
-        ENDPOINT_URL: {
-          outputs: betaStage.stackOutputs('WebService'),
-          outputName: 'Url',
-        },
-      },
-      commands: [
-        // Use 'curl' to GET the given URL and fail it it returns an error
-        'curl -Ssf $ENDPOINT_URL',
-      ],
-    }));
+    pipeline.addApplicationStage(betaApp, {
+      validations: [
+        Validation.shellScript({
+          name: 'TestEndpoint',
+          useOutputs: {
+            ENDPOINT_URL: pipeline.stackOutput(betaApp.urlOutput),
+          },
+          commands: [
+            // Use 'curl' to GET the given URL and fail it it returns an error
+            'curl -Ssf $ENDPOINT_URL',
+          ],
+        })]
+    });
 
-    pipeline.addApplicationStage('Gamma', new WebServiceApp({
-      outdir: 'cdk.out/gamma',
+    pipeline.addApplicationStage(new WebServiceApp(this, 'Gamma', {
       env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-2' }
     }));
   }

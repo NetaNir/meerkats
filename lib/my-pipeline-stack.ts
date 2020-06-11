@@ -1,6 +1,6 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import { App, Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
+import { Construct, SecretValue, Stack, StackProps, Stage } from '@aws-cdk/core';
 import { AppDeliveryPipeline, CdkBuilds } from "./app-delivery";
 
 export class MyPipelineStack extends Stack {
@@ -35,7 +35,7 @@ export class MyPipelineStack extends Stack {
     });
   }
 
-  public addApplication(stageName: string, app: App) {
-    return this.pipeline.addApplicationStage(stageName, app);
+  public addApplicationStage(stage: Stage) {
+    return this.pipeline.addApplicationStage(stage);
   }
 }

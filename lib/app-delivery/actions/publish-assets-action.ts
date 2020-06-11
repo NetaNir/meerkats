@@ -5,6 +5,21 @@ import * as events from '@aws-cdk/aws-events';
 import * as iam from '@aws-cdk/aws-iam';
 import { Construct, Lazy } from '@aws-cdk/core';
 
+/**
+ * Asset type we're publishing
+ */
+export enum AssetType {
+  /**
+   * A file
+   */
+  FILE = 'file',
+
+  /**
+   * A Docker image
+   */
+  DOCKER_IMAGE = 'docker-image',
+}
+
 export interface PublishAssetsActionProps {
   /**
    * Name of publishing action
@@ -15,6 +30,25 @@ export interface PublishAssetsActionProps {
    * The CodePipeline artifact that holds the Cloud Assembly.
    */
   readonly cloudAssemblyInput: codepipeline.Artifact;
+
+  /**
+   * AssetType we're publishing
+   */
+  readonly assetType: AssetType;
+
+  /**
+   * Version of CDK CLI to 'npm install'.
+   *
+   * @default - Latest version
+   */
+  readonly cdkCliVersion?: string;
+
+  /**
+   * Name of the CodeBuild project
+   *
+   * @default - Automatically generated
+   */
+  readonly projectName?: string;
 }
 
 export class PublishAssetsAction extends Construct implements codepipeline.IAction {
@@ -24,26 +58,32 @@ export class PublishAssetsAction extends Construct implements codepipeline.IActi
   constructor(scope: Construct, id: string, private readonly props: PublishAssetsActionProps) {
     super(scope, id);
 
+    const installSuffix = props.cdkCliVersion ? `@${props.cdkCliVersion}` : '';
+
     const project = new codebuild.PipelineProject(this, 'Default', {
+      projectName: this.props.projectName,
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
         phases: {
           install: {
-            commands: 'npm install -g cdk-assets',
+            commands: `npm install -g cdk-assets${installSuffix}`,
           },
           build: {
             commands: Lazy.listValue({ produce: () => this.commands }),
           },
         },
       }),
-      environment: {
-        privileged: true, // needed to perform Docker builds
-      },
+      // Needed to perform Docker builds
+      environment: props.assetType === AssetType.DOCKER_IMAGE ? { privileged: true } : undefined,
     });
+
+    const rolePattern = props.assetType === AssetType.DOCKER_IMAGE
+      ? 'arn:*:iam::*:role/*-image-publishing-role-*'
+      : 'arn:*:iam::*:role/*-file-publishing-role-*';
 
     project.addToRolePolicy(new iam.PolicyStatement({
       actions: ['sts:AssumeRole'],
-      resources: ['arn:*:iam::*:role/*-publishing-role-*'],
+      resources: [rolePattern],
     }));
 
     this.action = new codepipeline_actions.CodeBuildAction({

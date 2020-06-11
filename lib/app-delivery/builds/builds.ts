@@ -7,14 +7,24 @@ import { StandardNpmBuild, StandardNpmBuildProps } from './npm-build';
 import { StandardYarnBuild, StandardYarnBuildProps } from './yarn-build';
 
 export interface CdkBuildOptions {
-  readonly sourceOutput: codepipeline.Artifact;
-
-  readonly cloudAssemblyOutput: codepipeline.Artifact;
+  /**
+   * The (input) artifact that holds the Source
+   */
+  readonly sourceArtifact: codepipeline.Artifact;
 }
 
+/**
+ * Result of binding a CdkBuild to the Pipeline
+ */
 export interface CdkBuildConfig {
+  /**
+   * The Action that got added to the Pipeline
+   */
   readonly action: codepipeline.IAction;
 
+  /**
+   * The (output) artifact that holds the produced Cloud Assembly
+   */
   readonly cloudAssemblyArtifact: codepipeline.Artifact;
 }
 
@@ -41,6 +51,14 @@ export interface StandardBuildOptions {
    * @default 'Synth'
    */
   readonly actionName?: string;
+
+  /**
+   * Name of the CodeBuild project
+   *
+   * @default - Automatically generated
+   */
+  readonly projectName?: string;
+
 }
 
 export abstract class CdkBuilds {
@@ -78,29 +96,21 @@ export abstract class CdkBuilds {
     return new BuildSpecBuild(buildOptions);
   }
 
-  public static standardJavaBuild(_cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
-    throw new Error('not implemented yet');
-  }
-
-  public static standardPythonBuild(_cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
-    throw new Error('not implemented yet');
-  }
-
-  public static standardCSharpBuild(_cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
-    throw new Error('not implemented yet');
-  }
-
-  public static fromCodeBuildProject(project: codebuild.IProject, cdkBuildOutput: codepipeline.Artifact): ICdkBuild {
+  /**
+   * Use an existing CodeBuild project as a Build step
+   */
+  public static fromCodeBuildProject(project: codebuild.IProject): ICdkBuild {
+    const output = new codepipeline.Artifact();
     return {
       bind(_scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig {
         return {
           action: new codepipeline_actions.CodeBuildAction({
             actionName: 'Synth',
             project,
-            input: options.sourceOutput,
-            outputs: [cdkBuildOutput],
+            input: options.sourceArtifact,
+            outputs: [output],
           }),
-          cloudAssemblyArtifact: cdkBuildOutput,
+          cloudAssemblyArtifact: output,
         };
       }
     };
