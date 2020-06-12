@@ -54,6 +54,7 @@ export class StandardNpmBuild extends CdkBuild {
         actionName: this.props.actionName ?? 'Synth',
         project: new codebuild.PipelineProject(scope, 'CdkBuildProject', {
           projectName: this.props.projectName,
+          environment: this.props.environment,
           buildSpec: codebuild.BuildSpec.fromObject({
             version: '0.2',
             phases: {

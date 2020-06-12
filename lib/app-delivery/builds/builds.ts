@@ -52,6 +52,12 @@ export interface StandardBuildOptions {
    */
   readonly projectName?: string;
 
+  /**
+   * Build environment to use for CodeBuild job
+   *
+   * @default BuildEnvironment.LinuxBuildImage.STANDARD_1_0
+   */
+  readonly environment?: codebuild.BuildEnvironment;
 }
 
 export abstract class CdkBuild {
@@ -70,9 +76,9 @@ export abstract class CdkBuild {
   }
 
   /**
-   * Perform a build using a buildspec that's in the repository
+   * Perform a build using a custom buildspec
    *
-   * The repository's `buildspec.yaml` should contain the instructions necessary
+   * The buildspec should contain the instructions necessary
    * to build and run `cdk synth` the application, and declare the files in the synth
    * target directory (`cdk.out` if not configured to be different) as the output
    * artifact.
@@ -91,6 +97,19 @@ export abstract class CdkBuild {
 
   /**
    * Use an existing CodeBuild project as a Build step
+   *
+   * The buildspec should contain the instructions necessary
+   * to build and run `cdk synth` the application, and declare the files in the synth
+   * target directory (`cdk.out` if not configured to be different) as the output
+   * artifact.
+   *
+   * You would do this by adding the following at the end of the `buildspec.yaml` file:
+   *
+   * ```
+   *   artifacts:
+   *      base-directory: 'cdk.out'
+   *      files: '** /*'
+   * ```
    */
   public static fromCodeBuildProject(project: codebuild.IProject): CdkBuild {
     const output = new codepipeline.Artifact();

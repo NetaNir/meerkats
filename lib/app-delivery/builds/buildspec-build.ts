@@ -7,11 +7,11 @@ import { CdkBuild, CdkBuildConfig, CdkBuildOptions, StandardBuildOptions } from 
 
 export interface BuildSpecBuildProps extends StandardBuildOptions {
   /**
-   * Buildspec filename
+   * Buildspec to use
    *
-   * @default "buildspec.yml"
+   * @default - Use 'buildspec.yml' in the source repository
    */
-  readonly buildSpecFilename?: string;
+  readonly buildSpec?: codebuild.BuildSpec;
 }
 
 export class BuildSpecBuild extends CdkBuild {
@@ -27,7 +27,8 @@ export class BuildSpecBuild extends CdkBuild {
         actionName: this.props.actionName ?? 'Synth',
         project: new codebuild.PipelineProject(scope, 'CdkBuildProject', {
           projectName: this.props.projectName,
-          buildSpec: this.props.buildSpecFilename ? codebuild.BuildSpec.fromSourceFilename(this.props.buildSpecFilename) : undefined,
+          environment: this.props.environment,
+          buildSpec: this.props.buildSpec,
           environmentVariables: {
             ...copyEnvironmentVariables(...this.props.copyEnvironmentVariables || []),
             ...this.props.environmentVariables
