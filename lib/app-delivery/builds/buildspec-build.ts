@@ -3,7 +3,7 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import { Construct } from '@aws-cdk/core';
 import { copyEnvironmentVariables } from './_util';
-import { CdkBuildConfig, CdkBuildOptions, ICdkBuild, StandardBuildOptions } from "./builds";
+import { CdkBuild, CdkBuildConfig, CdkBuildOptions, StandardBuildOptions } from "./builds";
 
 export interface BuildSpecBuildProps extends StandardBuildOptions {
   /**
@@ -14,8 +14,9 @@ export interface BuildSpecBuildProps extends StandardBuildOptions {
   readonly buildSpecFilename?: string;
 }
 
-export class BuildSpecBuild implements ICdkBuild {
+export class BuildSpecBuild extends CdkBuild {
   constructor(private readonly props: BuildSpecBuildProps = {}) {
+    super();
   }
 
   public bind(scope: Construct, options: CdkBuildOptions): CdkBuildConfig {

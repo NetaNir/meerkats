@@ -2,9 +2,6 @@ import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import * as cdk from '@aws-cdk/core';
-import { BuildSpecBuild, BuildSpecBuildProps } from './buildspec-build';
-import { StandardNpmBuild, StandardNpmBuildProps } from './npm-build';
-import { StandardYarnBuild, StandardYarnBuildProps } from './yarn-build';
 
 export interface CdkBuildOptions {
   /**
@@ -26,10 +23,6 @@ export interface CdkBuildConfig {
    * The (output) artifact that holds the produced Cloud Assembly
    */
   readonly cloudAssemblyArtifact: codepipeline.Artifact;
-}
-
-export interface ICdkBuild {
-  bind(scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig;
 }
 
 export interface StandardBuildOptions {
@@ -61,18 +54,18 @@ export interface StandardBuildOptions {
 
 }
 
-export abstract class CdkBuilds {
+export abstract class CdkBuild {
   /**
    * Perform a standard NPM build
    */
-  public static standardNpmBuild(buildOptions: StandardNpmBuildProps = {}): ICdkBuild {
+  public static standardNpmBuild(buildOptions: StandardNpmBuildProps = {}): CdkBuild {
     return new StandardNpmBuild(buildOptions);
   }
 
   /**
    * Perform a standard Yarn build
    */
-  public static standardYarnBuild(buildOptions: StandardYarnBuildProps = {}): ICdkBuild {
+  public static standardYarnBuild(buildOptions: StandardYarnBuildProps = {}): CdkBuild {
     return new StandardYarnBuild(buildOptions);
   }
 
@@ -92,14 +85,14 @@ export abstract class CdkBuilds {
    *      files: '** /*'
    * ```
    */
-  public static buildSpecBuild(buildOptions: BuildSpecBuildProps = {}): ICdkBuild {
+  public static buildSpecBuild(buildOptions: BuildSpecBuildProps = {}): CdkBuild {
     return new BuildSpecBuild(buildOptions);
   }
 
   /**
    * Use an existing CodeBuild project as a Build step
    */
-  public static fromCodeBuildProject(project: codebuild.IProject): ICdkBuild {
+  public static fromCodeBuildProject(project: codebuild.IProject): CdkBuild {
     const output = new codepipeline.Artifact();
     return {
       bind(_scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig {
@@ -115,4 +108,10 @@ export abstract class CdkBuilds {
       }
     };
   }
+
+  public abstract bind(scope: cdk.Construct, options: CdkBuildOptions): CdkBuildConfig;
 }
+
+import { BuildSpecBuild, BuildSpecBuildProps } from './buildspec-build';
+import { StandardNpmBuild, StandardNpmBuildProps } from './npm-build';
+import { StandardYarnBuild, StandardYarnBuildProps } from './yarn-build';

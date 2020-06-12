@@ -3,7 +3,7 @@ import { App, CfnOutput, Construct, Stack, Stage } from '@aws-cdk/core';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as path from 'path';
 import { DeployCdkStackAction, PublishAssetsAction, UpdatePipelineAction } from './actions';
-import { ICdkBuild } from './builds';
+import { CdkBuild } from './builds';
 import { AssetManifest, DestinationIdentifier } from './private/asset-manifest';
 import { appOf, assemblyBuilderOf } from './private/construct-internals';
 import { AddStageOptions, AppDeliveryStage, AssetPublishingCommand, StackOutput } from './stage';
@@ -11,7 +11,7 @@ import { AddStageOptions, AppDeliveryStage, AssetPublishingCommand, StackOutput 
 export interface AppDeliveryPipelineProps {
   readonly source: codepipeline.IAction;
 
-  readonly build: ICdkBuild;
+  readonly build: CdkBuild;
 
   readonly pipelineName?: string;
 

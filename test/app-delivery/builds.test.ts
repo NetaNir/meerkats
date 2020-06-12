@@ -61,7 +61,7 @@ test.each([['npm'], ['yarn']])('%s build respects subdirectory', (npmYarn) => {
 });
 
 function npmYarnBuild(npmYarn: string) {
-  if (npmYarn === 'npm') { return appdelivery.CdkBuilds.standardNpmBuild; }
-  if (npmYarn === 'yarn') { return appdelivery.CdkBuilds.standardYarnBuild; }
+  if (npmYarn === 'npm') { return appdelivery.CdkBuild.standardNpmBuild; }
+  if (npmYarn === 'yarn') { return appdelivery.CdkBuild.standardYarnBuild; }
   throw new Error(`Expecting npm|yarn: ${npmYarn}`);
 }

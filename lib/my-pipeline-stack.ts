@@ -1,7 +1,7 @@
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
 import { Construct, SecretValue, Stack, StackProps, Stage } from '@aws-cdk/core';
-import { AppDeliveryPipeline, CdkBuilds } from "./app-delivery";
+import { AppDeliveryPipeline, CdkBuild } from "./app-delivery";
 
 export class MyPipelineStack extends Stack {
   private pipeline: AppDeliveryPipeline;
@@ -26,7 +26,7 @@ export class MyPipelineStack extends Stack {
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
 
-      build: CdkBuilds.standardNpmBuild({
+      build: CdkBuild.standardNpmBuild({
         // Forward environment variables to build if configured, so
         // that synthesized pipeline will yield the same pipeline as has been
         // synth'd locally.

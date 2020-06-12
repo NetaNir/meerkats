@@ -5,7 +5,7 @@ import { Construct } from '@aws-cdk/core';
 import * as path from 'path';
 import { cloudAssemblyBuildSpecDir } from '../private/construct-internals';
 import { copyEnvironmentVariables, filterEmpty } from './_util';
-import { CdkBuildConfig, CdkBuildOptions, ICdkBuild, StandardBuildOptions } from "./builds";
+import { CdkBuild, CdkBuildConfig, CdkBuildOptions, StandardBuildOptions } from "./builds";
 
 export interface StandardYarnBuildProps extends StandardBuildOptions {
   /**
@@ -37,8 +37,9 @@ export interface StandardYarnBuildProps extends StandardBuildOptions {
   readonly synthCommand?: string;
 }
 
-export class StandardYarnBuild implements ICdkBuild {
+export class StandardYarnBuild extends CdkBuild {
   constructor(private readonly props: StandardYarnBuildProps = {}) {
+    super();
   }
 
   public bind(scope: Construct, options: CdkBuildOptions): CdkBuildConfig {

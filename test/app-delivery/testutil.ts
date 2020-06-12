@@ -43,7 +43,7 @@ export class TestGitHubNpmPipeline extends appdelivery.AppDeliveryPipeline {
         repo: 'test',
         trigger: codepipeline_actions.GitHubTrigger.POLL,
       }),
-      build: appdelivery.CdkBuilds.standardNpmBuild(),
+      build: appdelivery.CdkBuild.standardNpmBuild(),
       ...props,
     });
   }
