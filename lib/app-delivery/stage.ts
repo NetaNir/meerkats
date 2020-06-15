@@ -6,7 +6,7 @@ import * as cxapi from '@aws-cdk/cx-api';
 import { AssetType, DeployCdkStackAction } from './actions';
 import { AssetManifest, DestinationIdentifier, DockerImageManifestEntry, FileManifestEntry } from './private/asset-manifest';
 import { topologicalSort } from './private/toposort';
-import { IValidation } from './validation';
+import { Validation } from './validation';
 
 export interface AppDeliveryStageProps {
   /**
@@ -36,7 +36,7 @@ export class AppDeliveryStage extends Construct {
   private _manualApprovalCounter = 1;
   private readonly pipelineStage: codepipeline.IStage;
   private readonly cloudAssemblyArtifact: codepipeline.Artifact;
-  private readonly validations: IValidation[] = [];
+  private readonly validations: Validation[] = [];
   private readonly stacksToDeploy = new Array<DeployStackCommand>();
   private readonly stageName: string;
   private readonly host: IStageHost;
@@ -81,7 +81,7 @@ export class AppDeliveryStage extends Construct {
   /**
    * Add the given validations at the end of the current stage
    */
-  public addValidations(...validations: IValidation[]) {
+  public addValidations(...validations: Validation[]) {
     this.validations.push(...validations);
   }
 
@@ -336,7 +336,7 @@ export interface AddStageOptions {
    *
    * @default - No validations
    */
-  readonly validations?: IValidation[];
+  readonly validations?: Validation[];
 
   /**
    * Add manual approvals before executing change sets

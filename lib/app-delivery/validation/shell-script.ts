@@ -3,7 +3,7 @@ import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import { Construct } from "@aws-cdk/core";
 import { AppDeliveryStage, StackOutput } from '../stage';
-import { IValidation } from "./validation";
+import { Validation } from './validation';
 
 export interface ShellScriptValidationProps {
   readonly name: string;
@@ -18,8 +18,9 @@ export interface ShellScriptValidationProps {
   readonly bashOptions?: string;
 }
 
-export class ShellScriptValidation implements IValidation {
+export class ShellScriptValidation extends Validation {
   constructor(private readonly props: ShellScriptValidationProps) {
+    super();
   }
 
   public bind(scope: Construct, stage: AppDeliveryStage) {
